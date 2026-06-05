@@ -1,19 +1,17 @@
-FROM --platform=amd64 python:3.12-slim
-
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency manifests first for layer caching
-COPY pyproject.toml ./
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 
-# Install dependencies into the system Python (no virtualenv needed in Docker)
-RUN uv pip install --system --no-cache -e .
+COPY frontend/ ./
 
-# Copy application source
-COPY app/ ./app/
+RUN npm run build
 
 EXPOSE 8080
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+ENV PORT=8080
+ENV HOSTNAME=0.0.0.0
+
+CMD ["npm", "run", "start"]
