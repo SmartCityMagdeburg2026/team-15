@@ -89,6 +89,15 @@ const BusIcon = () => (
   </div>
 );
 
+const LeafIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+    <path d="M12 3a9 9 0 0 0-9 9c0 4.97 4.03 9 9 9s9-4.03 9-9a9 9 0 0 0-9-9z" />
+    <path d="M12 3v18" />
+    <path d="M12 12c2-2 5-2 5-2s0 3-2 5" />
+    <path d="M12 12c-2-2-5-2-5-2s0 3 2 5" />
+  </svg>
+);
+
 const WarningIcon = () => (
   <div className="w-10 h-10 flex items-center justify-center text-orange-500">
     <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
@@ -219,7 +228,7 @@ export default function Home() {
     let latestTransit: TransitData = { status: "Minor Delays", delays: [] };
     let histAqi: AirQualityData | null = null;
     let histTransit: TransitData | null = null;
-    let latestElbe = { level: 2.35, status: "Normal" };
+    let latestElbe = { level: 2.35, level_cm: 235, status: "Normal" };
 
     // 1. Weather now & yesterday comparison
     try {
