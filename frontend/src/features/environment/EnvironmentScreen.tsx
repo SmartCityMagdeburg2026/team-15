@@ -133,7 +133,7 @@ export default function EnvironmentScreen() {
   const meanings = environmentMeaning(data.overallScore, data.recommendation);
   const badge = summaryBadgeColor(data.overallScore);
 
-  // Attempt to hydrate from live Open-Meteo APIs (non-blocking)
+  // Attempt to hydrate from live APIs (non-blocking): air quality + comfort + green access
   useEffect(() => {
     async function tryLiveData() {
       let newAirLabel: EnvironmentState["airQuality"]["label"] = environmentSeed.airQuality.label;
@@ -144,9 +144,13 @@ export default function EnvironmentScreen() {
       let newComfortScore = environmentSeed.urbanComfort.score;
       let newComfortDisplay = environmentSeed.urbanComfort.displayValue;
       let newComfortHelper = environmentSeed.urbanComfort.helper;
+      let newGreenLabel: EnvironmentState["greenAccess"]["label"] = environmentSeed.greenAccess.label;
+      let newGreenScore = environmentSeed.greenAccess.score;
+      let newGreenDisplay = environmentSeed.greenAccess.displayValue;
+      let newGreenHelper = environmentSeed.greenAccess.helper;
       let gotLive = false;
 
-      // 1. Air quality from Open-Meteo Air Quality API
+      // 1. Air quality — Open-Meteo Air Quality API
       try {
         const res = await fetch(
           "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=52.1205&longitude=11.6276&current=european_aqi,pm2_5,pm10"
@@ -155,7 +159,6 @@ export default function EnvironmentScreen() {
           const json = await res.json();
           const aqiRaw: number = json?.current?.european_aqi ?? -1;
           if (aqiRaw >= 0) {
-            // european_aqi: 0–20 Good, 20–40 Fair, 40+ Poor (mapped to spec labels)
             if (aqiRaw <= 20) {
               newAirLabel = "Good";
               newAirDisplay = "Good air conditions";
@@ -169,16 +172,13 @@ export default function EnvironmentScreen() {
               newAirDisplay = "Weaker air quality";
               newAirHelper = "Air quality is weaker today in some parts of the city.";
             }
-            // Normalise 0–100: invert so higher = better
             newAirScore = clampScore(100 - aqiRaw);
             gotLive = true;
           }
         }
-      } catch {
-        // silent — seed values remain
-      }
+      } catch { /* silent — seed values remain */ }
 
-      // 2. Urban comfort from Open-Meteo Forecast API
+      // 2. Urban comfort — Open-Meteo Forecast API
       try {
         const res = await fetch(
           "https://api.open-meteo.com/v1/forecast?latitude=52.1205&longitude=11.6276&current=temperature_2m,apparent_temperature,wind_speed_10m,precipitation"
@@ -200,32 +200,86 @@ export default function EnvironmentScreen() {
               newComfortHelper  = "Conditions are manageable, though sunnier or exposed areas may feel warmer.";
             } else {
               newComfortLabel   = "Stressed";
-              newComfortDisplay = "Heat building";
+              newComfortDisplay = wind > 45 ? "Windy & exposed" : "Heat building";
               newComfortHelper  = "Heat or exposure may make outdoor conditions less comfortable today.";
             }
             newComfortScore = comfortScore(newComfortLabel);
             gotLive = true;
           }
         }
-      } catch {
-        // silent — seed values remain
-      }
+      } catch { /* silent — seed values remain */ }
+
+      // 3. Green access — Overpass API (count parks/gardens/woods in Magdeburg bounds)
+      try {
+        const query = `[out:json][timeout:10];(way["leisure"="park"](52.09,11.58,52.16,11.72);way["leisure"="garden"](52.09,11.58,52.16,11.72);way["natural"="wood"](52.09,11.58,52.16,11.72););out count;`;
+        const res = await fetch(
+          `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`
+        );
+        if (res.ok) {
+          const json = await res.json();
+          const parkCount: number = json?.elements?.[0]?.tags?.total ?? -1;
+          if (parkCount >= 0) {
+            if (parkCount >= 30) {
+              newGreenLabel   = "Strong";
+              newGreenDisplay = "Abundant green access";
+              newGreenHelper  = "Excellent access to parks and green corridors across the city.";
+              newGreenScore   = greenScore("Strong");
+            } else if (parkCount >= 12) {
+              newGreenLabel   = "Moderate";
+              newGreenDisplay = "Nearby in many districts";
+              newGreenHelper  = "Green access is decent overall, though not equally distributed.";
+              newGreenScore   = greenScore("Moderate");
+            } else {
+              newGreenLabel   = "Uneven";
+              newGreenDisplay = "Limited in some areas";
+              newGreenHelper  = "Green spaces are unevenly spread — some districts have better access than others.";
+              newGreenScore   = greenScore("Uneven");
+            }
+            gotLive = true;
+          }
+        }
+      } catch { /* silent — seed values remain */ }
 
       if (gotLive) {
         const air     = airScore(newAirLabel, newAirScore);
         const comfort = comfortScore(newComfortLabel);
-        const green   = greenScore(data.greenAccess.label);
+        const green   = greenScore(newGreenLabel);
         const overall = overallEnvironmentScore({ air, comfort, green });
         const summary = environmentSummary(overall);
 
-        const updatedAt = new Date().toISOString();
+        // Dynamic notes from live data
+        const liveNotes: string[] = [
+          newAirLabel === "Good"
+            ? "Air feels fresh across most of the city today."
+            : newAirLabel === "Fair"
+            ? "Air quality is acceptable but fresher away from busier central corridors."
+            : "Air quality is weaker today — prefer ventilated or outdoor green areas.",
+          newComfortLabel === "Comfortable"
+            ? "Outdoor conditions are pleasant — a good day for walks and park visits."
+            : newComfortLabel === "Mixed"
+            ? "Greener and shaded areas may feel more comfortable around midday."
+            : "Heat or wind may make exposed areas less comfortable — seek shade.",
+          newGreenLabel === "Strong"
+            ? "Excellent park access today across Magdeburg — Rotehorn and Elbauenpark ideal."
+            : newGreenLabel === "Moderate"
+            ? "Access to parks is stronger in some districts than others."
+            : "Some districts have limited green access — Rotehorn remains a good option.",
+        ];
+
+        // Dynamic recommendation
+        const recommendation =
+          overall >= 80
+            ? "Best for: outdoor walks, cycling, and time in parks."
+            : overall >= 65
+            ? "Best for: short walks and time in greener areas."
+            : "Best for: indoor or shaded areas during peak outdoor hours.";
 
         setData((prev) => ({
           ...prev,
           freshness: {
             state: "live",
-            updatedAt,
-            label: `Updated just now`,
+            updatedAt: new Date().toISOString(),
+            label: "Updated just now",
           },
           summary,
           overallScore: overall,
@@ -241,6 +295,14 @@ export default function EnvironmentScreen() {
             displayValue: newComfortDisplay,
             helper: newComfortHelper,
           },
+          greenAccess: {
+            label: newGreenLabel,
+            score: newGreenScore,
+            displayValue: newGreenDisplay,
+            helper: newGreenHelper,
+          },
+          notes: liveNotes,
+          recommendation,
         }));
       }
     }

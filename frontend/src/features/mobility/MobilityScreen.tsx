@@ -7,6 +7,7 @@ import { mobilitySeed } from "./seed";
 import {
   freshnessLabel,
   mobilityMeaning,
+  mobilitySummary,
   askElbeAnswer,
 } from "./utils";
 
@@ -125,7 +126,7 @@ function summaryBadgeColor(score: number) {
 // ── Main Component ────────────────────────────────────────────────────────
 
 export default function MobilityScreen() {
-  const [data] = useState<MobilityState>(mobilitySeed);
+  const [data, setData] = useState<MobilityState>(mobilitySeed);
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [elbeAnswer, setElbeAnswer] = useState<string>("");
 
@@ -133,14 +134,125 @@ export default function MobilityScreen() {
   const meanings = mobilityMeaning(data.overallScore, data.recommendation);
   const badge = summaryBadgeColor(data.overallScore);
 
-  // Attempt to hydrate with live data in background (non-blocking)
+  // Hydrate all metrics from live transit API
   useEffect(() => {
     async function tryLiveData() {
       try {
         const res = await fetch("/api/transit");
         if (!res.ok) return;
-        // If live transit returns, could update transitFlow score here.
-        // For now, keep seeded data stable.
+        const json = await res.json();
+
+        const delays: { line: string; route?: string; delay: string; status: string }[] =
+          json.delays ?? [];
+        const delayCount: number = json.delayCount ?? delays.filter((d) => d.delay !== "0 min").length;
+        const totalLines: number = json.totalLines ?? delays.length;
+        const onTime = totalLines - delayCount;
+        const transitScoreRaw: number = json.transitScore ?? (totalLines > 0 ? Math.round((onTime / totalLines) * 100) : 90);
+
+        // ── transitFlow ─────────────────────────────────────
+        const transitLabel: MobilityState["transitFlow"]["label"] =
+          transitScoreRaw >= 80 ? "Good" : transitScoreRaw >= 60 ? "Moderate" : "Poor";
+        const transitHelper =
+          transitLabel === "Good"
+            ? "Buses and trams are running frequently with few delays."
+            : transitLabel === "Moderate"
+            ? "Several lines are running with minor delays — allow extra time."
+            : "Significant delays across multiple lines. Check MVB app for updates.";
+
+        // ── disruptionLevel ──────────────────────────────────
+        const disruptionLabel: MobilityState["disruptionLevel"]["label"] =
+          delayCount === 0 ? "Low" : delayCount <= 3 ? "Low" : delayCount <= 6 ? "Moderate" : "High";
+        const disruptionHelper =
+          delayCount === 0
+            ? "No disruptions reported right now. Everything is running smoothly."
+            : delayCount <= 3
+            ? `${delayCount} minor issue${delayCount > 1 ? "s" : ""}. No major disruptions right now.`
+            : delayCount <= 6
+            ? `${delayCount} lines affected. Plan for some delays in parts of the city.`
+            : `${delayCount} lines experiencing delays. Significant disruptions across the network.`;
+        const disruptionScore = disruptionLabel === "Low" ? 80 : disruptionLabel === "Moderate" ? 55 : 25;
+
+        // ── movingComfort (inferred from delay severity) ─────
+        const avgDelay = delays.reduce((sum, d) => sum + parseInt(d.delay), 0) / (delays.length || 1);
+        const comfortLabel: MobilityState["movingComfort"]["label"] =
+          avgDelay <= 1.5 ? "Good" : avgDelay <= 4 ? "Fair" : "Limited";
+        const comfortDisplay = comfortLabel === "Good" ? "Light traffic" : comfortLabel === "Fair" ? "Some congestion" : "Heavy congestion";
+        const comfortHelper =
+          comfortLabel === "Good"
+            ? "Roads are clear and public spaces feel comfortable."
+            : comfortLabel === "Fair"
+            ? "Some routes are experiencing slowdowns — allow a bit more time."
+            : "Traffic and delays are making movement noticeably harder today.";
+        const comfortScoreVal = comfortLabel === "Good" ? 85 : comfortLabel === "Fair" ? 60 : 35;
+
+        // ── overallScore ─────────────────────────────────────
+        const overallScore = 0.5 * transitScoreRaw + 0.3 * disruptionScore + 0.2 * comfortScoreVal;
+
+        // ── recommendation ───────────────────────────────────
+        const recommendation =
+          overallScore >= 80
+            ? "Best for: short city trips and cycling."
+            : overallScore >= 65
+            ? "Best for: using tram lines — avoid busier bus routes."
+            : "Best for: flexible routes — check MVB app before travelling.";
+
+        // ── notes from live delays ───────────────────────────
+        const liveNotes: MobilityState["notes"] = [];
+        const delayed = delays.filter((d) => d.delay !== "0 min").sort(
+          (a, b) => parseInt(b.delay) - parseInt(a.delay)
+        );
+        for (const d of delayed.slice(0, 3)) {
+          const mins = parseInt(d.delay);
+          liveNotes.push({
+            text: `${d.line} — ${mins} min delay${d.route ? ` on ${d.route}` : ""}.`,
+            time: new Date().toTimeString().slice(0, 5),
+            color: mins >= 7 ? "amber" : "teal",
+          });
+        }
+        if (liveNotes.length === 0) {
+          liveNotes.push({
+            text: "All MVB lines are running on schedule.",
+            time: new Date().toTimeString().slice(0, 5),
+            color: "green",
+          });
+        }
+        // Always add Elbe bridge note
+        liveNotes.push({
+          text: "Elbbrücke clear — No restrictions on the Elbe bridge.",
+          time: new Date().toTimeString().slice(0, 5),
+          color: "green",
+        });
+
+        setData({
+          freshness: {
+            state: "live",
+            updatedAt: json.timestamp ?? new Date().toISOString(),
+            label: "Live from MVB network",
+          },
+          summary: mobilitySummary(overallScore),
+          overallScore,
+          transitFlow: {
+            label: transitLabel,
+            score: transitScoreRaw,
+            displayValue: `${transitScoreRaw}%`,
+            helper: transitHelper,
+          },
+          disruptionLevel: {
+            label: disruptionLabel,
+            active: delayCount,
+            score: disruptionScore,
+            helper: disruptionHelper,
+          },
+          movingComfort: {
+            label: comfortLabel,
+            score: comfortScoreVal,
+            displayValue: comfortDisplay,
+            helper: comfortHelper,
+          },
+          notes: liveNotes,
+          recommendation,
+          prompts: mobilitySeed.prompts,
+        });
       } catch {
         // Silent fallback — seeded data already displayed
       }
