@@ -16,6 +16,7 @@ function renderMarkdownToHtml(text: string) {
 }
 import MobilityScreen from "@/features/mobility/MobilityScreen";
 import EnvironmentScreen from "@/features/environment/EnvironmentScreen";
+import RentByDistrict from "@/features/housing/affordability/RentByDistrict";
 
 // Types matching the backend API
 interface WeatherData {
@@ -917,7 +918,11 @@ export default function Home() {
               </div>
 
               {/* CARD 4: Traffic Disruptions */}
-              <div className="bg-gradient-to-br from-white via-white to-rose-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-orange-500/20 transition-all duration-300 min-h-[220px] text-center items-center">
+              <div
+                className="bg-gradient-to-br from-white via-white to-rose-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-orange-500/20 transition-all duration-300 min-h-[220px] text-center items-center cursor-pointer"
+                onClick={() => setActiveTab("mobility")}
+                title="View Mobility screen"
+              >
                 <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-wider w-full text-left">
                   <span>Traffic alerts</span>
                   <span className="text-orange-500 text-[11px]">⚠</span>
@@ -939,7 +944,11 @@ export default function Home() {
               </div>
 
               {/* CARD 5: Elbe Level */}
-              <div className="bg-gradient-to-br from-white via-white to-blue-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-blue-500/20 transition-all duration-300 min-h-[220px] text-center items-center">
+              <div
+                className="bg-gradient-to-br from-white via-white to-blue-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-blue-500/20 transition-all duration-300 min-h-[220px] text-center items-center cursor-pointer"
+                onClick={() => setActiveTab("environment")}
+                title="View Environment screen"
+              >
                 <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-wider w-full text-left">
                   <span>Elbe hydrology</span>
                   <span className="text-blue-500 text-[11px]">🌊</span>
@@ -1128,100 +1137,10 @@ export default function Home() {
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
               
-              {/* Rental Index by District */}
-              <div className="lg:col-span-6 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs">
-                <h3 className="text-[16px] font-black text-[#0a2540] mb-4">Average Rent Price by District</h3>
-                
-                <div className="space-y-3">
-                  {[
-                    { district: "Altstadt Center", rent: "€11.20 / m²", status: "Premium", color: "bg-orange-500" },
-                    { district: "Stadtfeld Area", rent: "€9.10 / m²", status: "Moderate", color: "bg-amber-500" },
-                    { district: "Buckau Riverbanks", rent: "€8.80 / m²", status: "Moderate", color: "bg-amber-500" },
-                    { district: "Sudenburg Junction", rent: "€7.90 / m²", status: "Accessible", color: "bg-emerald-500" },
-                    { district: "Olvenstedt Suburb", rent: "€6.50 / m²", status: "Accessible", color: "bg-emerald-500" }
-                  ].map((dist, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-3 border border-zinc-50 rounded-xl">
-                      <span className="text-xs font-black text-zinc-800">{dist.district}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-bold text-zinc-900">{dist.rent}</span>
-                        <span className={`w-2 h-2 rounded-full ${dist.color}`}></span>
-                        <span className="text-[10px] font-black uppercase text-zinc-650 min-w-[70px] text-right">{dist.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="lg:col-span-12">
+                <RentByDistrict />
               </div>
 
-              {/* Rental Price Growth Chart */}
-              <div className="lg:col-span-6 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-                <div>
-                  <h3 className="text-[15.5px] font-black text-[#0a2540] mb-3">5-Year Rental Price Index Trend</h3>
-                  <p className="text-[11px] text-zinc-400 font-semibold mb-4">Average monthly rent progression over the last 5 years in Magdeburg (€/m²).</p>
-                  
-                  {/* SVG Area Chart */}
-                  <div className="relative h-40 w-full mt-2">
-                    <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
-                      <line x1="0" y1="20" x2="300" y2="20" stroke="#f8fafc" strokeWidth="1.5" />
-                      <line x1="0" y1="50" x2="300" y2="50" stroke="#f8fafc" strokeWidth="1.5" />
-                      <line x1="0" y1="80" x2="300" y2="80" stroke="#f8fafc" strokeWidth="1.5" />
-                      
-                      {/* Area background */}
-                      <path
-                        d="M 10 85 Q 80 78 150 50 T 290 25 L 290 100 L 10 100 Z"
-                        fill="rgba(12, 107, 91, 0.08)"
-                      />
-                      
-                      {/* Line path */}
-                      <path
-                        d="M 10 85 Q 80 78 150 50 T 290 25"
-                        fill="none"
-                        stroke="#0c6b5b"
-                        strokeWidth="3.5"
-                        strokeLinecap="round"
-                      />
-                      
-                      <circle cx="290" cy="25" r="4.5" fill="#0c6b5b" stroke="white" strokeWidth="2" />
-                    </svg>
-                    <div className="flex justify-between text-[9.5px] text-zinc-450 font-extrabold mt-2 px-1">
-                      <span>2022 (€7.20)</span>
-                      <span>2024 (€7.85)</span>
-                      <span>2025 (€8.20)</span>
-                      <span>Today (€8.55)</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-[#eefcf7] border border-green-200/80 rounded-xl p-3 text-[11px] text-[#3c6b5d] font-semibold mt-4">
-                  🏢 <strong>Rent Cap Monitoring:</strong> Active regulation tracking ensures new rental lease listings stay within local index limits.
-                </div>
-              </div>
-
-            </div>
-
-            {/* Affordable Housing Construction Progress */}
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs">
-              <h3 className="text-[16px] font-black text-[#0a2540] mb-4">Affordable Residential Projects</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4.5">
-                {[
-                  { name: "Sudenburg Eco-Housing (Stage 1)", progress: 85, units: 140, completion: "Q3 2026" },
-                  { name: "Buckau Riverfront Social Lofts", progress: 40, units: 95, completion: "Q2 2027" },
-                  { name: "Neustadt Municipal Re-Development", progress: 65, units: 210, completion: "Q4 2026" }
-                ].map((proj, idx) => (
-                  <div key={idx} className="border border-zinc-150 rounded-xl p-4 bg-zinc-50/40 space-y-2 text-left">
-                    <div className="flex justify-between items-start text-xs font-black">
-                      <span className="text-[#0a2540] line-clamp-1">{proj.name}</span>
-                      <span className="text-[#0c6b5b]">{proj.progress}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-[#0c6b5b] rounded-full" style={{ width: `${proj.progress}%` }} />
-                    </div>
-                    <div className="flex justify-between text-[9.5px] text-zinc-400 font-semibold pt-1">
-                      <span>{proj.units} units</span>
-                      <span>Target: {proj.completion}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
 
           </div>
