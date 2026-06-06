@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import MobilityScreen from "@/features/mobility/MobilityScreen";
+import EnvironmentScreen from "@/features/environment/EnvironmentScreen";
 
 // Types matching the backend API
 interface WeatherData {
@@ -8,6 +10,7 @@ interface WeatherData {
   condition: string;
   humidity: number;
   windSpeed: number;
+  comparison?: string;
 }
 
 interface AirQualityData {
@@ -15,6 +18,7 @@ interface AirQualityData {
   status: string;
   pm25: number;
   pm10: number;
+  comparison?: string;
 }
 
 interface TransitData {
@@ -120,7 +124,8 @@ export default function Home() {
     aqi: 42,
     status: "Good",
     pm25: 9.4,
-    pm10: 18.2
+    pm10: 18.2,
+    comparison: "Slightly better than yesterday"
   });
 
   // 3. Mobility status state
@@ -147,6 +152,18 @@ export default function Home() {
 
   const [lastUpdatedText, setLastUpdatedText] = useState("Updated 8 min ago");
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Computed Pulse Index state
+  const [pulseIndex, setPulseIndex] = useState({
+    score: 81,
+    prevScore: 77,
+    airDelta: 3,
+    mobilityDelta: 2,
+    trafficDelta: -1
+  });
+
+  // Dynamic City Pulse Log Feed
+  const [pulseLogs, setPulseLogs] = useState<{ icon: string; title: string; tag: string; tagColor: string; desc: string }[]>([]);
 
   // Transit delay list state (Mobility sub-tab queue)
   const [transitDelays, setTransitDelays] = useState<{ line: string; delay: string; status: string }[]>([
@@ -194,88 +211,333 @@ export default function Home() {
     }
   }, [messages, isTyping]);
 
+  async function performTelemetrySync() {
+    // Local accumulators for pulse index computation
+    let latestWeather: WeatherData = { temperature: 18, condition: "Partly cloudy", humidity: 62, windSpeed: 14.5 };
+    let latestAqi: AirQualityData  = { aqi: 42, status: "Good", pm25: 9.4, pm10: 18.2 };
+    let latestTransit: TransitData = { status: "Minor Delays", delays: [] };
+    let histAqi: AirQualityData | null = null;
+    let histTransit: TransitData | null = null;
+    let latestElbe = { level: 2.35, status: "Normal" };
+
+    // 1. Weather now & yesterday comparison
+    try {
+      const [res, histRes] = await Promise.all([
+        fetch("/api/weather"),
+        fetch("/api/weather?history=true")
+      ]);
+      if (res.ok) {
+        const data: WeatherData = await res.json();
+        latestWeather = data;
+        let comp = "Stable vs yesterday";
+        if (histRes.ok) {
+          const histData: WeatherData = await histRes.json();
+          const diff = data.temperature - histData.temperature;
+          comp = diff === 0 ? "Same temperature as yesterday" : `${Math.abs(diff)}°C ${diff > 0 ? "warmer" : "cooler"} than yesterday`;
+        }
+        setWeather({
+          temperature: Math.round(data.temperature),
+          condition: data.condition,
+          humidity: data.humidity,
+          windSpeed: data.windSpeed,
+          comparison: comp
+        });
+      }
+    } catch (err) {
+      console.error("Weather telemetry sync failed:", err);
+    }
+
+    // 2. Air quality now & yesterday comparison
+    try {
+      const [res, histRes] = await Promise.all([
+        fetch("/api/air-quality"),
+        fetch("/api/air-quality?history=true")
+      ]);
+      if (res.ok) {
+        const data: AirQualityData = await res.json();
+        latestAqi = data;
+        let comp = "Stable vs yesterday";
+        if (histRes.ok) {
+          const histData: AirQualityData = await histRes.json();
+          histAqi = histData;
+          const diff = data.aqi - histData.aqi;
+          if (diff === 0) comp = "Same AQI as yesterday";
+          else comp = `${Math.abs(diff)} AQI pts ${diff < 0 ? "better" : "worse"} than yesterday`;
+        }
+        setAqi({
+          aqi: data.aqi,
+          status: data.status,
+          pm25: data.pm25,
+          pm10: data.pm10,
+          comparison: comp
+        });
+      }
+    } catch (err) {
+      console.error("AQI telemetry sync failed:", err);
+    }
+
+    // 3. Transit & Mobility score with yesterday comparison
+    try {
+      const [res, histRes] = await Promise.all([
+        fetch("/api/transit"),
+        fetch("/api/transit?history=true")
+      ]);
+      if (res.ok) {
+        const data: TransitData = await res.json();
+        latestTransit = data;
+        setTransitDelays(data.delays);
+
+        const delayCount = data.delays.filter(d => d.delay !== "0 min").length;
+        
+        let trafficComp = "No delays active";
+        if (histRes.ok) {
+          const histData: TransitData = await histRes.json();
+          histTransit = histData;
+          const histDelayCount = histData.delays.filter(d => d.delay !== "0 min").length;
+          const diff = delayCount - histDelayCount;
+          if (diff === 0) trafficComp = "Same delays as yesterday";
+          else trafficComp = `${Math.abs(diff)} ${diff > 0 ? "more" : "fewer"} delayed line${Math.abs(diff) > 1 ? "s" : ""} than yesterday`;
+        }
+        setTraffic({
+          activeCount: delayCount,
+          desc: `${delayCount} line${delayCount !== 1 ? "s" : ""} with delays.`,
+          comparison: trafficComp
+        });
+
+        // Calculate mobility score & status dynamically
+        const totalLines = data.delays.length;
+        const onTimeLines = totalLines - delayCount;
+        const transitScoreVal = totalLines > 0 ? (onTimeLines / totalLines) * 100 : 90;
+        let disruptionScoreVal = 100;
+        if (delayCount === 0) disruptionScoreVal = 100;
+        else if (delayCount <= 2) disruptionScoreVal = 80;
+        else if (delayCount <= 4) disruptionScoreVal = 60;
+        else if (delayCount <= 6) disruptionScoreVal = 40;
+        else disruptionScoreVal = 20;
+
+        const comfortScoreVal = 85;
+        const overallScore = 0.5 * transitScoreVal + 0.3 * disruptionScoreVal + 0.2 * comfortScoreVal;
+
+        let histOverallScore = 80;
+        if (histTransit) {
+          const histDelayCount = histTransit.delays.filter(d => d.delay !== "0 min").length;
+          const histTotalLines = histTransit.delays.length;
+          const histOnTimeLines = histTotalLines - histDelayCount;
+          const histTransitScoreVal = histTotalLines > 0 ? (histOnTimeLines / histTotalLines) * 100 : 90;
+          let histDisruptionScoreVal = 100;
+          if (histDelayCount === 0) histDisruptionScoreVal = 100;
+          else if (histDelayCount <= 2) histDisruptionScoreVal = 80;
+          else if (histDelayCount <= 4) histDisruptionScoreVal = 60;
+          else if (histDelayCount <= 6) histDisruptionScoreVal = 40;
+          else histDisruptionScoreVal = 20;
+          histOverallScore = 0.5 * histTransitScoreVal + 0.3 * histDisruptionScoreVal + 0.2 * comfortScoreVal;
+        }
+
+        let statusLabel = "Good";
+        let statusDesc = "Normal traffic flow across the city.";
+        if (overallScore >= 80) {
+          statusLabel = "Good";
+          statusDesc = "Getting around feels mostly smooth today.";
+        } else if (overallScore >= 65) {
+          statusLabel = "Moderate";
+          statusDesc = "Getting around is manageable today, with a few local slowdowns.";
+        } else if (overallScore >= 50) {
+          statusLabel = "Fair";
+          statusDesc = "Getting around may take a bit longer today in some areas.";
+        } else {
+          statusLabel = "Poor";
+          statusDesc = "Getting around feels more difficult than usual today.";
+        }
+
+        const scoreDiff = Math.round(overallScore) - Math.round(histOverallScore);
+        let mobComp = "Same as yesterday";
+        if (scoreDiff !== 0) {
+          mobComp = `${scoreDiff > 0 ? "Better" : "Worse"} than yesterday (Score: ${Math.round(overallScore)} vs ${Math.round(histOverallScore)})`;
+        } else {
+          mobComp = `Score: ${Math.round(overallScore)}/100 (same as yesterday)`;
+        }
+
+        setMobilityStatus({
+          status: statusLabel,
+          desc: statusDesc,
+          comparison: mobComp
+        });
+      }
+    } catch (err) {
+      console.error("Mobility telemetry sync failed:", err);
+    }
+
+    // 4. Elbe hydrology (real data from PEGELONLINE + yesterday's historical comparison)
+    try {
+      const [res, histRes] = await Promise.all([
+        fetch("https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/MAGDEBURG-STROMBR%C3%9CCKE/W/currentmeasurement.json"),
+        fetch("https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/MAGDEBURG-STROMBR%C3%9CCKE/W/measurements.json?start=P1D")
+      ]);
+      if (res.ok) {
+        const data = await res.json();
+        const currentLevelMeters = data.value / 100; // cm to meters
+        let statusText = "Normal";
+        let descText = "Below flood warning level (4.50 m).";
+        if (currentLevelMeters >= 4.5) {
+          statusText = "Flood Warning";
+          descText = "Above flood warning level (4.50 m).";
+        } else if (currentLevelMeters <= 1.0) {
+          statusText = "Low Water";
+          descText = "Below normal low water mark.";
+        }
+        latestElbe = { level: currentLevelMeters, status: statusText };
+
+        let comp = "Stable vs yesterday";
+        if (histRes.ok) {
+          const histData = await histRes.json();
+          if (Array.isArray(histData) && histData.length > 0) {
+            const yesterdayLevelMeters = histData[0].value / 100;
+            const diff = currentLevelMeters - yesterdayLevelMeters;
+            comp = diff === 0 ? "Same level as yesterday" : `${Math.abs(diff).toFixed(2)} m ${diff > 0 ? "higher" : "lower"} than yesterday`;
+          }
+        }
+
+        setElbe({
+          level: currentLevelMeters,
+          status: statusText,
+          desc: descText,
+          comparison: comp
+        });
+      }
+    } catch (err) {
+      console.error("Elbe hydrology telemetry sync failed:", err);
+    }
+
+    // 5. Compute Pulse Index & log feed from all live data
+    computePulseIndex(latestAqi, latestWeather, latestTransit, histAqi, histTransit, latestElbe);
+  }
+
+
+  // Compute Pulse Index & dynamic log feed from live state after sync
+  function computePulseIndex(
+    currentAqi: AirQualityData,
+    currentWeather: WeatherData,
+    currentTransit: TransitData,
+    histAqi: AirQualityData | null,
+    histTransit: TransitData | null,
+    currentElbe: { level: number; status: string },
+  ) {
+    // AQI component: lower AQI = higher score (inverted, clamped 0-100)
+    const aqiComponent = Math.max(0, Math.min(100, 100 - currentAqi.aqi));
+
+    // Weather comfort score
+    const temp = currentWeather.temperature;
+    const wind = currentWeather.windSpeed;
+    const weatherComponent =
+      (temp >= 14 && temp <= 24 && wind <= 25) ? 90 :
+      (temp >= 10 && temp <= 30 && wind <= 40) ? 72 : 55;
+
+    // Transit component
+    const totalLines = currentTransit.delays.length;
+    const delayCount = currentTransit.delays.filter(d => d.delay !== "0 min").length;
+    const onTimeLines = totalLines - delayCount;
+    const transitScoreRaw = totalLines > 0 ? Math.round((onTimeLines / totalLines) * 100) : 90;
+    const disruptionScore = delayCount === 0 ? 100 : delayCount <= 2 ? 80 : delayCount <= 5 ? 60 : 35;
+    const transitComponent = Math.round(0.6 * transitScoreRaw + 0.4 * disruptionScore);
+
+    const newScore = Math.round(0.40 * aqiComponent + 0.35 * transitComponent + 0.25 * weatherComponent);
+
+    // Compute previous day score for deltas
+    let prevAqiComponent = aqiComponent;
+    let prevTransitComponent = transitComponent;
+    if (histAqi) prevAqiComponent = Math.max(0, Math.min(100, 100 - histAqi.aqi));
+    if (histTransit) {
+      const hTotal = histTransit.delays.length;
+      const hDelay = histTransit.delays.filter(d => d.delay !== "0 min").length;
+      const hOnTime = hTotal - hDelay;
+      const hTransit = hTotal > 0 ? Math.round((hOnTime / hTotal) * 100) : 90;
+      const hDisruption = hDelay === 0 ? 100 : hDelay <= 2 ? 80 : hDelay <= 5 ? 60 : 35;
+      prevTransitComponent = Math.round(0.6 * hTransit + 0.4 * hDisruption);
+    }
+    const prevScore = Math.round(0.40 * prevAqiComponent + 0.35 * prevTransitComponent + 0.25 * weatherComponent);
+
+    const airDelta = Math.round(aqiComponent - prevAqiComponent);
+    const mobilityDelta = Math.round(transitComponent - prevTransitComponent);
+    const trafficDelta = delayCount - (histTransit ? histTransit.delays.filter(d => d.delay !== "0 min").length : delayCount);
+
+    setPulseIndex({ score: newScore, prevScore, airDelta, mobilityDelta, trafficDelta });
+
+    // Build dynamic log feed
+    const logs: typeof pulseLogs = [];
+
+    // AQI log entry
+    if (airDelta < 0) {
+      logs.push({
+        icon: "leaf",
+        title: "Air quality improved",
+        tag: "ECOLOGY",
+        tagColor: "text-emerald-700 bg-emerald-50",
+        desc: `PM2.5 decreased — air is ${Math.abs(airDelta)} AQI pts better than yesterday across city sensors.`,
+      });
+    } else if (airDelta > 0) {
+      logs.push({
+        icon: "warning",
+        title: "Air quality slightly worse",
+        tag: "ECOLOGY",
+        tagColor: "text-orange-700 bg-orange-50",
+        desc: `AQI is ${airDelta} pts higher than yesterday. Current reading: ${currentAqi.aqi} (${currentAqi.status}).`,
+      });
+    } else {
+      logs.push({
+        icon: "leaf",
+        title: "Air quality stable",
+        tag: "ECOLOGY",
+        tagColor: "text-emerald-700 bg-emerald-50",
+        desc: `AQI is ${currentAqi.aqi} today (${currentAqi.status}) — stable vs yesterday.`,
+      });
+    }
+
+    // Transit log entry
+    const worstDelay = currentTransit.delays
+      .filter(d => d.delay !== "0 min")
+      .sort((a, b) => parseInt(b.delay) - parseInt(a.delay))[0];
+    if (worstDelay) {
+      logs.push({
+        icon: "bus",
+        title: `Delays on ${worstDelay.line}`,
+        tag: "MOBILITY",
+        tagColor: "text-orange-700 bg-orange-50",
+        desc: `${worstDelay.line} is running ${worstDelay.delay} late. ${delayCount} line${delayCount > 1 ? 's' : ''} affected across the MVB network.`,
+      });
+    } else {
+      logs.push({
+        icon: "bus",
+        title: "All MVB lines on schedule",
+        tag: "MOBILITY",
+        tagColor: "text-emerald-700 bg-emerald-50",
+        desc: "No delays reported across trams and buses right now.",
+      });
+    }
+
+    // Elbe log entry
+    logs.push({
+      icon: "wave",
+      title: currentElbe.status === "Flood Warning" ? "Elbe flood warning active" : currentElbe.status === "Low Water" ? "Elbe at low water" : "Elbe level stable",
+      tag: "HYDROLOGY",
+      tagColor: currentElbe.status === "Flood Warning" ? "text-rose-700 bg-rose-50" : "text-blue-700 bg-blue-50",
+      desc: `River gauge at ${currentElbe.level.toFixed(2)} m — ${currentElbe.status === "Normal" ? "well below flood warning level (4.50 m). Status remains safe." : currentElbe.status}.`,
+    });
+
+    setPulseLogs(logs);
+  }
   // Background fetch logic (loads real API details to keep dashboard live)
   useEffect(() => {
-    async function loadTelemetry() {
-      try {
-        const [weatherRes, aqRes, transitRes] = await Promise.all([
-          fetch("/api/weather"),
-          fetch("/api/air-quality"),
-          fetch("/api/transit")
-        ]);
-
-        if (weatherRes.ok && aqRes.ok && transitRes.ok) {
-          const weatherData: WeatherData = await weatherRes.json();
-          const aqData: AirQualityData = await aqRes.json();
-          const transitData: TransitData = await transitRes.json();
-
-          setWeather({
-            temperature: Math.round(weatherData.temperature),
-            condition: weatherData.condition,
-            humidity: weatherData.humidity,
-            windSpeed: weatherData.windSpeed
-          });
-
-          setAqi(aqData);
-
-          setTransitDelays(transitData.delays);
-
-          const delayCount = transitData.delays.filter(d => d.delay !== "0 min").length;
-          setTraffic({
-            activeCount: delayCount,
-            desc: `${delayCount} incidents causing delays.`,
-            comparison: "Slightly worse than yesterday"
-          });
-        }
-      } catch (err) {
-        console.error("Telemetry background sync failed:", err);
-      }
-    }
-    loadTelemetry();
+    performTelemetrySync();
   }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     setLastUpdatedText("Updating...");
-
-    try {
-      const [weatherRes, aqRes, transitRes] = await Promise.all([
-        fetch("/api/weather"),
-        fetch("/api/air-quality"),
-        fetch("/api/transit")
-      ]);
-
-      if (weatherRes.ok && aqRes.ok && transitRes.ok) {
-        const weatherData: WeatherData = await weatherRes.json();
-        const aqData: AirQualityData = await aqRes.json();
-        const transitData: TransitData = await transitRes.json();
-
-        setWeather({
-          temperature: Math.round(weatherData.temperature),
-          condition: weatherData.condition,
-          humidity: weatherData.humidity,
-          windSpeed: weatherData.windSpeed
-        });
-
-        setAqi(aqData);
-
-        setTransitDelays(transitData.delays);
-
-        const delayCount = transitData.delays.filter(d => d.delay !== "0 min").length;
-        setTraffic({
-          activeCount: delayCount,
-          desc: `${delayCount} incidents causing delays.`,
-          comparison: "Slightly worse than yesterday"
-        });
-      }
-    } catch (err) {
-      console.error("Manual refresh failed:", err);
-    } finally {
-      setTimeout(() => {
-        setIsRefreshing(false);
-        setLastUpdatedText("Updated just now");
-      }, 750);
-    }
+    await performTelemetrySync();
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setLastUpdatedText("Updated just now");
+    }, 750);
   };
 
   // Handle sending chat message
@@ -499,24 +761,36 @@ export default function Home() {
                 <div className="flex flex-col text-left">
                   <span className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">Pulse Index</span>
                   <div className="flex items-baseline gap-2 mt-1.5">
-                    <span className="text-4xl font-black text-white tracking-tighter">81<span className="text-emerald-300 text-sm">/100</span></span>
-                    <span className="text-xs font-black text-[#3cf6cc] flex items-center gap-0.5 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                      ↑ 4 pts
-                    </span>
+                    <span className="text-4xl font-black text-white tracking-tighter">{pulseIndex.score}<span className="text-emerald-300 text-sm">/100</span></span>
+                    {pulseIndex.score !== pulseIndex.prevScore && (
+                      <span className={`text-xs font-black flex items-center gap-0.5 px-2 py-0.5 rounded border ${
+                        pulseIndex.score > pulseIndex.prevScore
+                          ? "text-[#3cf6cc] bg-emerald-500/10 border-emerald-500/20"
+                          : "text-rose-300 bg-rose-500/10 border-rose-500/20"
+                      }`}>
+                        {pulseIndex.score > pulseIndex.prevScore ? "↑" : "↓"} {Math.abs(pulseIndex.score - pulseIndex.prevScore)} pts
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="border-l border-white/10 pl-5 space-y-1 text-[11px] text-emerald-100/90 font-medium">
                   <div className="flex justify-between gap-4">
                     <span className="text-emerald-200/80 font-semibold">Air Quality:</span>
-                    <span className="text-[#3cf6cc] font-black">+3</span>
+                    <span className={`font-black ${pulseIndex.airDelta >= 0 ? "text-[#3cf6cc]" : "text-rose-400"}`}>
+                      {pulseIndex.airDelta > 0 ? "+" : ""}{pulseIndex.airDelta}
+                    </span>
                   </div>
                   <div className="flex justify-between gap-4">
                     <span className="text-emerald-200/80 font-semibold">Mobility:</span>
-                    <span className="text-[#3cf6cc] font-black">+2</span>
+                    <span className={`font-black ${pulseIndex.mobilityDelta >= 0 ? "text-[#3cf6cc]" : "text-rose-400"}`}>
+                      {pulseIndex.mobilityDelta > 0 ? "+" : ""}{pulseIndex.mobilityDelta}
+                    </span>
                   </div>
                   <div className="flex justify-between gap-4">
                     <span className="text-emerald-200/80 font-semibold">Traffic delays:</span>
-                    <span className="text-rose-400 font-black">-1</span>
+                    <span className={`font-black ${pulseIndex.trafficDelta <= 0 ? "text-[#3cf6cc]" : "text-rose-400"}`}>
+                      {pulseIndex.trafficDelta > 0 ? "+" : ""}{pulseIndex.trafficDelta}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -525,8 +799,12 @@ export default function Home() {
             {/* Status Cards Grid */}
             <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
               
-              {/* CARD 1: Weather */}
-              <div className="bg-gradient-to-br from-white via-white to-amber-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-amber-400/20 transition-all duration-300 min-h-[220px]">
+              {/* CARD 1: Weather — clickable → Environment tab */}
+              <div
+                className="bg-gradient-to-br from-white via-white to-amber-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-amber-400/20 transition-all duration-300 min-h-[220px] cursor-pointer"
+                onClick={() => setActiveTab("environment")}
+                title="View Environment screen"
+              >
                 <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-wider">
                   <span>Weather now</span>
                   <span className="text-amber-500 text-[11px]">⛅</span>
@@ -544,13 +822,17 @@ export default function Home() {
                   <div className="text-[11px] font-bold text-zinc-400">Feels like {weather.temperature - 1}°C • Wind {weather.windSpeed} km/h</div>
                   <div className="mt-3 border-t border-zinc-100 pt-3 flex items-center gap-1.5 text-[11px] font-extrabold text-[#2563eb]">
                     <ArrowUpRight className="text-blue-500 w-3.5 h-3.5" />
-                    <span>{weather.comparison}</span>
+                    <span>{weather.comparison ?? 'Slightly better than yesterday'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* CARD 2: Air Quality */}
-              <div className="bg-gradient-to-br from-white via-white to-emerald-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-emerald-500/20 transition-all duration-300 min-h-[220px] text-center items-center">
+              {/* CARD 2: Air Quality — clickable → Environment tab */}
+              <div
+                className="bg-gradient-to-br from-white via-white to-emerald-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-emerald-500/20 transition-all duration-300 min-h-[220px] text-center items-center cursor-pointer"
+                onClick={() => setActiveTab("environment")}
+                title="View Environment screen"
+              >
                 <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-wider w-full text-left">
                   <span>Air quality</span>
                   <span className="relative flex h-2 w-2">
@@ -591,13 +873,17 @@ export default function Home() {
                   <div className="text-[11px] text-zinc-500 font-semibold leading-tight line-clamp-2">Atmospheric pollutants are within standard limits.</div>
                   <div className="mt-3 border-t border-zinc-100 pt-3 flex items-center justify-center gap-1.5 text-[11px] font-extrabold text-[#10b981] w-full">
                     <ArrowDownRight className="text-[#10b981] w-3.5 h-3.5" />
-                    <span>Slightly better than yesterday</span>
+                    <span>{aqi.comparison ?? "Slightly better than yesterday"}</span>
                   </div>
                 </div>
               </div>
 
-              {/* CARD 3: Mobility Status */}
-              <div className="bg-gradient-to-br from-white via-white to-emerald-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-emerald-500/20 transition-all duration-300 min-h-[220px] text-center items-center">
+              {/* CARD 3: Mobility Status — clickable → Mobility tab */}
+              <div
+                className="bg-gradient-to-br from-white via-white to-emerald-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-emerald-500/20 transition-all duration-300 min-h-[220px] text-center items-center cursor-pointer"
+                onClick={() => setActiveTab("mobility")}
+                title="View Mobility screen"
+              >
                 <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-wider w-full text-left">
                   <span>Mobility status</span>
                   <span className="text-[#10b981] text-[11px]">✓</span>
@@ -679,51 +965,49 @@ export default function Home() {
                   </div>
                   
                   <div className="space-y-4">
-                    
-                    {/* Log 1: Air quality */}
-                    <div className="flex gap-4 items-start bg-zinc-50/50 hover:bg-zinc-50 border border-zinc-100 rounded-xl p-3.5 transition-colors">
-                      <div className="w-8 h-8 rounded-full bg-emerald-50 flex-shrink-0 flex items-center justify-center text-emerald-600 border border-emerald-100">
-                        <LeafIcon className="w-4 h-4 fill-emerald-100/10" />
-                      </div>
-                      <div className="text-[13px] leading-snug">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-zinc-800">Air quality improved</span>
-                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-150/50 px-1.5 py-0.5 rounded uppercase">ECOLOGY</span>
+                    {pulseLogs.length > 0 ? pulseLogs.map((log, idx) => (
+                      <div key={idx} className="flex gap-4 items-start bg-zinc-50/50 hover:bg-zinc-50 border border-zinc-100 rounded-xl p-3.5 transition-colors">
+                        <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center border ${
+                          log.icon === "leaf" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                          log.icon === "bus"  ? "bg-orange-50 text-orange-600 border-orange-100" :
+                          log.icon === "wave" ? "bg-blue-50 text-blue-600 border-blue-100" :
+                          "bg-orange-50 text-orange-600 border-orange-100"
+                        }`}>
+                          {log.icon === "leaf" && <LeafIcon className="w-4 h-4 fill-emerald-100/10" />}
+                          {log.icon === "bus" && (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                              <rect x="3" y="6" width="18" height="11" rx="2" />
+                              <path d="M5 17v2a1 1 0 001 1h1a1 1 0 001-1v-2M16 17v2a1 1 0 001 1h1a1 1 0 001-1v-2" />
+                              <path d="M3 10h18" />
+                            </svg>
+                          )}
+                          {log.icon === "wave" && <WaveIcon />}
+                          {log.icon === "warning" && (
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2V8h2v4z" />
+                            </svg>
+                          )}
                         </div>
-                        <p className="text-zinc-500 mt-1 font-semibold text-xs leading-normal">PM2.5 values decreased by 6 µg/m³ near the Stadtfeld sensors district.</p>
-                      </div>
-                    </div>
-
-                    {/* Log 2: Traffic */}
-                    <div className="flex gap-4 items-start bg-zinc-50/50 hover:bg-zinc-50 border border-zinc-100 rounded-xl p-3.5 transition-colors">
-                      <div className="w-8 h-8 rounded-full bg-orange-50/80 flex-shrink-0 flex items-center justify-center text-orange-600 border border-orange-100">
-                        <svg className="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2V8h2v4z" />
-                        </svg>
-                      </div>
-                      <div className="text-[13px] leading-snug">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-zinc-800">Delays on B1 Route</span>
-                          <span className="text-[9px] font-bold text-orange-700 bg-orange-150/50 px-1.5 py-0.5 rounded uppercase">MOBILITY</span>
+                        <div className="text-[13px] leading-snug">
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-zinc-800">{log.title}</span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${log.tagColor}`}>{log.tag}</span>
+                          </div>
+                          <p className="text-zinc-500 mt-1 font-semibold text-xs leading-normal">{log.desc}</p>
                         </div>
-                        <p className="text-zinc-500 mt-1 font-semibold text-xs leading-normal">Collision near Olvenstedter Straße has been cleared; expect minor residual delays.</p>
                       </div>
-                    </div>
-
-                    {/* Log 3: Elbe water */}
-                    <div className="flex gap-4 items-start bg-zinc-50/50 hover:bg-zinc-50 border border-zinc-100 rounded-xl p-3.5 transition-colors">
-                      <div className="w-8 h-8 rounded-full bg-blue-50 flex-shrink-0 flex items-center justify-center text-blue-600 border border-blue-100">
-                        <WaveIcon />
-                      </div>
-                      <div className="text-[13px] leading-snug">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-zinc-800">Elbe level rising slowly</span>
-                          <span className="text-[9px] font-bold text-blue-700 bg-blue-150/50 px-1.5 py-0.5 rounded uppercase">HYDROLOGY</span>
+                    )) : (
+                      // Skeleton placeholders while data loads
+                      [0,1,2].map(i => (
+                        <div key={i} className="flex gap-4 items-start bg-zinc-50/50 border border-zinc-100 rounded-xl p-3.5">
+                          <div className="w-8 h-8 rounded-full bg-zinc-100 flex-shrink-0 animate-pulse" />
+                          <div className="flex-1 space-y-2">
+                            <div className="h-3 bg-zinc-100 rounded w-1/3 animate-pulse" />
+                            <div className="h-2.5 bg-zinc-100 rounded w-2/3 animate-pulse" />
+                          </div>
                         </div>
-                        <p className="text-zinc-500 mt-1 font-semibold text-xs leading-normal">Mild rainfall upstream has slightly raised water gauge heights. Status remains completely safe.</p>
-                      </div>
-                    </div>
-
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -792,251 +1076,12 @@ export default function Home() {
 
         {/* TAB 2: Mobility View */}
         {activeTab === "mobility" && (
-          <div className="space-y-8 animate-fadeIn text-left">
-            <div>
-              <h2 className="text-[26px] font-black tracking-tight text-[#0a2540]">
-                Mobility & Transportation
-              </h2>
-              <p className="text-sm text-zinc-500 font-semibold mt-1">Real-time traffic status, transit delays queue, bicycle flows, and peak predictions.</p>
-            </div>
-
-            {/* Quick Stats Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4.5">
-              <div className="bg-white border border-zinc-200/80 rounded-2xl p-4.5 shadow-xs">
-                <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">Transit Congestion</span>
-                <div className="text-2xl font-black text-zinc-800 mt-1">14% <span className="text-xs font-bold text-emerald-500">(Optimal)</span></div>
-                <span className="text-[10px] text-zinc-400 font-semibold mt-1 block">Low commuter traffic density</span>
-              </div>
-              <div className="bg-white border border-zinc-200/80 rounded-2xl p-4.5 shadow-xs">
-                <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">Daily Cyclist Vol.</span>
-                <div className="text-2xl font-black text-[#0c6b5b] mt-1">4,120 <span className="text-xs font-bold text-[#0c6b5b]">(Active)</span></div>
-                <span className="text-[10px] text-zinc-400 font-semibold mt-1 block">Peak trail: Elberadweg route</span>
-              </div>
-              <div className="bg-white border border-zinc-200/80 rounded-2xl p-4.5 shadow-xs">
-                <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">Avg MVB Delay</span>
-                <div className="text-2xl font-black text-zinc-800 mt-1">2.1 min</div>
-                <span className="text-[10px] text-zinc-400 font-semibold mt-1 block">Trams running at 98.4% consistency</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-              
-              {/* Transit Delays List */}
-              <div className="lg:col-span-6 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs">
-                <h3 className="text-[16px] font-black text-[#0a2540] mb-4 flex items-center gap-2">
-                  🚌 Live MVB Transit Delay Queue
-                </h3>
-                
-                <div className="divide-y divide-zinc-100">
-                  {transitDelays.map((t, idx) => (
-                    <div key={idx} className="flex justify-between items-center py-3 first:pt-0 last:pb-0 text-sm">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
-                        <span className="font-extrabold text-zinc-800">{t.line}</span>
-                      </div>
-                      <span className={`font-black px-2.5 py-0.5 rounded-lg text-xs ${
-                        t.delay === "0 min" ? "bg-green-50 text-emerald-600 border border-green-200" : "bg-amber-50 text-amber-600 border border-amber-200"
-                      }`}>
-                        {t.delay === "0 min" ? "On Time" : `+${t.delay}`}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Peak Hours Congestion Prediction Chart */}
-              <div className="lg:col-span-6 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-                <div>
-                  <h3 className="text-[16px] font-black text-[#0a2540] mb-3">Peak Commuter Hours (Congestion Forecast)</h3>
-                  <p className="text-[11px] text-zinc-400 font-semibold mb-4">Real-time prediction of transit load density index across the day.</p>
-                  
-                  {/* SVG line chart */}
-                  <div className="relative h-36 w-full mt-2">
-                    <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
-                      <line x1="0" y1="20" x2="300" y2="20" stroke="#f8fafc" strokeWidth="1.5" />
-                      <line x1="0" y1="50" x2="300" y2="50" stroke="#f8fafc" strokeWidth="1.5" />
-                      <line x1="0" y1="80" x2="300" y2="80" stroke="#f8fafc" strokeWidth="1.5" />
-                      
-                      {/* Peak chart line */}
-                      <path
-                        d="M 10 90 Q 50 85 70 30 T 95 60 T 150 90 T 210 20 T 260 70 T 290 85"
-                        fill="none"
-                        stroke="#0c6b5b"
-                        strokeWidth="3.5"
-                        strokeLinecap="round"
-                      />
-                      
-                      {/* AM Peak Marker */}
-                      <circle cx="70" cy="30" r="4.5" fill="#f97316" stroke="white" strokeWidth="2" />
-                      {/* PM Peak Marker */}
-                      <circle cx="210" cy="20" r="4.5" fill="#f97316" stroke="white" strokeWidth="2" />
-                    </svg>
-                    <div className="flex justify-between text-[9.5px] text-zinc-400 font-extrabold mt-2 px-1">
-                      <span>06:00 AM</span>
-                      <span>09:00 AM (AM Peak)</span>
-                      <span>01:00 PM</span>
-                      <span>05:00 PM (PM Peak)</span>
-                      <span>08:00 PM</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-[#eefcf7] border border-green-200/80 rounded-xl p-3 text-[11px] text-[#3c6b5d] font-semibold mt-4">
-                  💡 <strong>Smart Routing:</strong> Selecting routes bypassing B1 during peak AM (07:45 - 08:30) saves an average of 9 minutes per commute.
-                </div>
-              </div>
-
-            </div>
-
-            {/* Smart Mobility Infrastructure Card */}
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs">
-              <h3 className="text-[16px] font-black text-[#0a2540] mb-4">Magdeburg Eco-Transit Projects</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  { name: "Sudenburg Electric Bus Corridors", progress: 60, district: "Sudenburg", status: "In Progress" },
-                  { name: "Altstadt Smart Parking Grid", progress: 85, district: "Altstadt", status: "Near Completion" }
-                ].map((proj, idx) => (
-                  <div key={idx} className="border border-zinc-100 rounded-xl p-4 bg-zinc-50/40 space-y-2">
-                    <div className="flex justify-between items-center text-xs font-extrabold">
-                      <span className="text-[#0a2540]">{proj.name}</span>
-                      <span className="text-[#0c6b5b]">{proj.progress}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-[#0c6b5b] rounded-full" style={{ width: `${proj.progress}%` }} />
-                    </div>
-                    <span className="text-[10px] text-zinc-400 font-semibold block mt-1">Status: {proj.status} • {proj.progress}% optimized routing implemented</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
+          <MobilityScreen />
         )}
 
         {/* TAB 3: Environment View */}
         {activeTab === "environment" && (
-          <div className="space-y-8 animate-fadeIn text-left">
-            <div>
-              <h2 className="text-[26px] font-black tracking-tight text-[#0a2540]">
-                Ecology & Air Quality
-              </h2>
-              <p className="text-sm text-zinc-500 font-semibold mt-1">Localized district sensor monitoring, PM2.5 trends, noise indices, and green cover.</p>
-            </div>
-
-            {/* Quick Stats Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4.5">
-              <div className="bg-white border border-zinc-200/80 rounded-2xl p-4.5 shadow-xs">
-                <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">City Avg AQI</span>
-                <div className="text-2xl font-black text-emerald-600 mt-1">{aqi.aqi} <span className="text-xs font-bold text-emerald-500">Good</span></div>
-                <span className="text-[10px] text-zinc-400 font-semibold mt-1 block">Atmospheric indexes optimal</span>
-              </div>
-              <div className="bg-white border border-zinc-200/80 rounded-2xl p-4.5 shadow-xs">
-                <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">Carbon Absorption</span>
-                <div className="text-2xl font-black text-zinc-800 mt-1">12,400 <span className="text-xs font-bold text-zinc-400">t/year</span></div>
-                <span className="text-[10px] text-zinc-400 font-semibold mt-1 block">Supported by municipal parks</span>
-              </div>
-              <div className="bg-white border border-zinc-200/80 rounded-2xl p-4.5 shadow-xs">
-                <span className="text-xs text-zinc-400 font-bold uppercase tracking-wider block">Noise Pollution Index</span>
-                <div className="text-2xl font-black text-zinc-800 mt-1">52 dB</div>
-                <span className="text-[10px] text-zinc-400 font-semibold mt-1 block">Comfortable urban threshold</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-              
-              {/* Local Air Quality by District */}
-              <div className="lg:col-span-6 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs">
-                <h3 className="text-[16px] font-black text-[#0a2540] mb-4">Ecology Metric by District</h3>
-                
-                <div className="space-y-3">
-                  {[
-                    { district: "Altstadt Center", aqiVal: 32, status: "Good", color: "bg-emerald-500" },
-                    { district: "Stadtfeld Area", aqiVal: 42, status: "Good", color: "bg-emerald-500" },
-                    { district: "Buckau Riverbanks", aqiVal: 55, status: "Moderate", color: "bg-amber-500" },
-                    { district: "Sudenburg Junction", aqiVal: 38, status: "Good", color: "bg-emerald-500" }
-                  ].map((dist, idx) => (
-                    <div key={idx} className="flex justify-between items-center p-3 border border-zinc-50 rounded-xl">
-                      <span className="text-xs font-black text-zinc-800">{dist.district}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-bold text-zinc-500">AQI: {dist.aqiVal}</span>
-                        <span className={`w-2.5 h-2.5 rounded-full ${dist.color}`}></span>
-                        <span className="text-[10.5px] font-black uppercase text-zinc-700 min-w-[65px] text-right">{dist.status}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* PM2.5 Trends Chart */}
-              <div className="lg:col-span-6 bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
-                <div>
-                  <h3 className="text-[16px] font-black text-[#0a2540] mb-3">PM2.5 Atmospheric Trends</h3>
-                  <p className="text-[11px] text-zinc-400 font-semibold mb-4">Weekly atmospheric fine particulates monitoring (μg/m³).</p>
-                  
-                  {/* SVG Area Chart */}
-                  <div className="relative h-36 w-full mt-2">
-                    <svg className="w-full h-full" viewBox="0 0 300 100" preserveAspectRatio="none">
-                      <line x1="0" y1="20" x2="300" y2="20" stroke="#f8fafc" strokeWidth="1.5" />
-                      <line x1="0" y1="50" x2="300" y2="50" stroke="#f8fafc" strokeWidth="1.5" />
-                      <line x1="0" y1="80" x2="300" y2="80" stroke="#f8fafc" strokeWidth="1.5" />
-                      
-                      {/* Gradient background path */}
-                      <path
-                        d="M 10 75 Q 60 70 100 45 T 200 35 T 290 25 L 290 100 L 10 100 Z"
-                        fill="rgba(12, 107, 91, 0.08)"
-                      />
-                      
-                      {/* Main line */}
-                      <path
-                        d="M 10 75 Q 60 70 100 45 T 200 35 T 290 25"
-                        fill="none"
-                        stroke="#0c6b5b"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                      />
-                      
-                      <circle cx="290" cy="25" r="4" fill="#0c6b5b" stroke="white" strokeWidth="1.5" />
-                    </svg>
-                    <div className="flex justify-between text-[9.5px] text-zinc-400 font-extrabold mt-2 px-1">
-                      <span>Mon (14.2)</span>
-                      <span>Wed (11.5)</span>
-                      <span>Fri (9.8)</span>
-                      <span>Today ({aqi.pm25} μg/m³)</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-[#eefcf7] border border-green-200/80 rounded-xl p-3 text-[11px] text-[#3c6b5d] font-semibold mt-4">
-                  🍃 <strong>Target Met:</strong> Magdeburg fine particulate indices are sitting 18% lower than the strict European Union thresholds.
-                </div>
-              </div>
-
-            </div>
-
-            {/* Tree Canopy and Waste Management Metrics */}
-            <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs">
-              <h3 className="text-[16px] font-black text-[#0a2540] mb-4">Sustainability Indicators</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="border border-zinc-100 rounded-xl p-4 bg-zinc-50/40">
-                  <span className="text-xs text-zinc-400 font-bold uppercase">Tree Canopy Cover</span>
-                  <div className="text-2xl font-black text-zinc-800 mt-1">24.5%</div>
-                  <div className="w-full h-2 bg-zinc-100 rounded-full mt-2 overflow-hidden">
-                    <div className="h-full bg-emerald-600 rounded-full" style={{ width: "81%" }} />
-                  </div>
-                  <span className="text-[10px] text-zinc-400 font-semibold block mt-1">Target: 30% urban canopy cover by 2030</span>
-                </div>
-                <div className="border border-zinc-100 rounded-xl p-4 bg-zinc-50/40">
-                  <span className="text-xs text-zinc-400 font-bold uppercase">Waste Collection Optimization</span>
-                  <div className="text-2xl font-black text-zinc-800 mt-1">92%</div>
-                  <div className="w-full h-2 bg-zinc-100 rounded-full mt-2 overflow-hidden">
-                    <div className="h-full bg-emerald-600 rounded-full" style={{ width: "92%" }} />
-                  </div>
-                  <span className="text-[10px] text-zinc-400 font-semibold block mt-1">Smart containers routes efficiency score</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
+          <EnvironmentScreen />
         )}
 
         {/* TAB 4: Housing & Affordability View */}
