@@ -1,6 +1,19 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+
+// Minimal, safe markdown renderer for bot replies: supports **bold**, *italic*, and line breaks.
+function escapeHtml(str: string) {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderMarkdownToHtml(text: string) {
+  const safe = escapeHtml(text);
+  let html = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/\*(.+?)\*/g, "<em>$1</em>");
+  html = html.replace(/\n/g, "<br/>");
+  return html;
+}
 import MobilityScreen from "@/features/mobility/MobilityScreen";
 import EnvironmentScreen from "@/features/environment/EnvironmentScreen";
 
@@ -197,7 +210,7 @@ export default function Home() {
   // Chatbot State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<{ sender: "user" | "bot"; text: string }[]>([
-    { sender: "bot", text: "Hello! I am Ottobot, your Magdeburg city assistant. Ask me about weather, transit, air quality, or projects." }
+    { sender: "bot", text: "Hello! I am Ask Otto, your Magdeburg city assistant. Ask me about weather, transit, air quality, or projects." }
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -1437,12 +1450,10 @@ export default function Home() {
             <div className="bg-[#0c6b5b] px-4 py-3.5 flex justify-between items-center text-white">
               <div className="flex items-center gap-2.5">
                 <div className="w-7.5 h-7.5 bg-white/10 rounded-lg flex items-center justify-center">
-                  <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 10.742h.01m3.999 0h.01M9 16.5h6m-12-3h18a2 2 0 002-2V7a2 2 0 00-2-2H3a2 2 0 00-2 2v4.5a2 2 0 002 2z" />
-                  </svg>
+                  <img src="/ask-otto-logo.svg" alt="Ask Otto logo" className="w-4.5 h-4.5 object-contain" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-black leading-none">Ottobot</h4>
+                  <h4 className="text-xs font-black leading-none">Ask Otto</h4>
                   <span className="text-[9.5px] text-[#cbf3eb] font-bold mt-1 block">Smart City Assistant</span>
                 </div>
               </div>
@@ -1468,14 +1479,18 @@ export default function Home() {
                         : "bg-white text-zinc-700 rounded-tl-none border border-zinc-200/80 shadow-xs font-semibold"
                     }`}
                   >
-                    {msg.text}
+                    {msg.sender === "bot" ? (
+                      <div dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(msg.text) }} />
+                    ) : (
+                      msg.text
+                    )}
                   </div>
                 </div>
               ))}
               {isTyping && (
                 <div className="flex justify-start">
                   <div className="bg-white border border-zinc-200/85 rounded-2xl rounded-tl-none px-3.5 py-2.5 text-xs text-zinc-400 flex items-center gap-1.5 shadow-xs font-semibold">
-                    <span>Ottobot is thinking</span>
+                    <span>Ask Otto is thinking</span>
                     <span className="flex gap-0.5">
                       <span className="h-1 w-1 rounded-full bg-zinc-400 animate-bounce"></span>
                       <span className="h-1 w-1 rounded-full bg-zinc-400 animate-bounce delay-75"></span>
@@ -1516,9 +1531,7 @@ export default function Home() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
             </svg>
           ) : (
-            <svg className="w-6.5 h-6.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 10.742h.01m3.999 0h.01M9 16.5h6m-12-3h18a2 2 0 002-2V7a2 2 0 00-2-2H3a2 2 0 00-2 2v4.5a2 2 0 002 2z" />
-            </svg>
+            <img src="/ask-otto-logo.svg" alt="Ask Otto" className="w-6.5 h-6.5 object-contain" />
           )}
 
           {/* Tiny pulse indicator dot */}
