@@ -159,6 +159,7 @@ export default function Home() {
   // 5. Elbe level state
   const [elbe, setElbe] = useState({
     level: 2.35,
+    level_cm: 235,
     status: "Normal",
     desc: "Below flood warning level (4.50 m).",
     comparison: "0.08 m vs yesterday"
@@ -381,15 +382,17 @@ export default function Home() {
       console.error("Mobility telemetry sync failed:", err);
     }
 
-    // 4. Elbe hydrology (real data from PEGELONLINE + yesterday's historical comparison)
+    // 4. Elbe hydrology (internal proxy -> Pegelonline)
     try {
       const [res, histRes] = await Promise.all([
-        fetch("https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/MAGDEBURG-STROMBR%C3%9CCKE/W/currentmeasurement.json"),
-        fetch("https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations/MAGDEBURG-STROMBR%C3%9CCKE/W/measurements.json?start=P1D")
+        fetch("/api/water-level"),
+        fetch("/api/water-level?history=true")
       ]);
       if (res.ok) {
         const data = await res.json();
-        const currentLevelMeters = data.value / 100; // cm to meters
+        // Prefer `value_m` if present; otherwise derive from cm fields
+        const currentLevelMeters = data.value_m != null ? Number(data.value_m) : Number(data.value ?? data.value_cm ?? 0) / 100;
+        const currentLevelCm = data.value_cm != null ? Number(data.value_cm) : data.value != null ? Number(data.value) : Math.round(currentLevelMeters * 100);
         let statusText = "Normal";
         let descText = "Below flood warning level (4.50 m).";
         if (currentLevelMeters >= 4.5) {
@@ -399,13 +402,14 @@ export default function Home() {
           statusText = "Low Water";
           descText = "Below normal low water mark.";
         }
-        latestElbe = { level: currentLevelMeters, status: statusText };
+        latestElbe = { level: currentLevelMeters, level_cm: currentLevelCm, status: statusText };
 
         let comp = "Stable vs yesterday";
         if (histRes.ok) {
           const histData = await histRes.json();
-          if (Array.isArray(histData) && histData.length > 0) {
-            const yesterdayLevelMeters = histData[0].value / 100;
+          const arr = histData?.measurements ?? histData;
+          if (Array.isArray(arr) && arr.length > 0) {
+            const yesterdayLevelMeters = Number(arr[0].value ?? arr[0].level ?? 0) / 100;
             const diff = currentLevelMeters - yesterdayLevelMeters;
             comp = diff === 0 ? "Same level as yesterday" : `${Math.abs(diff).toFixed(2)} m ${diff > 0 ? "higher" : "lower"} than yesterday`;
           }
@@ -413,6 +417,7 @@ export default function Home() {
 
         setElbe({
           level: currentLevelMeters,
+          level_cm: currentLevelCm,
           status: statusText,
           desc: descText,
           comparison: comp
@@ -957,7 +962,9 @@ export default function Home() {
                 <div className="my-3 flex flex-col items-center gap-1">
                   <WaveIcon />
                   <div className="text-center">
-                    <div className="text-2xl font-black text-zinc-955 tracking-tighter leading-none mt-1">{elbe.level.toFixed(2)} m</div>
+                    <div className="text-2xl font-black text-zinc-955 tracking-tighter leading-none mt-1">
+                      {elbe.level.toFixed(2)} m {elbe.level_cm ? `(${elbe.level_cm} cm)` : ""}
+                    </div>
                     <div className="text-[9.5px] font-black text-[#2563eb] mt-0.5 uppercase tracking-wider bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-md inline-block">{elbe.status}</div>
                   </div>
                 </div>
