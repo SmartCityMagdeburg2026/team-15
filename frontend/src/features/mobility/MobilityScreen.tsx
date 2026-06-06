@@ -8,7 +8,6 @@ import {
   freshnessLabel,
   mobilityMeaning,
   mobilitySummary,
-  askElbeAnswer,
 } from "./utils";
 
 // Dynamically import the map so it never SSR-renders (Leaflet is browser-only)
@@ -58,12 +57,6 @@ const InfoIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   </svg>
 );
 
-const ChatIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-  </svg>
-);
-
 const NoteIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2" />
@@ -73,18 +66,6 @@ const NoteIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 const CheckIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-  </svg>
-);
-
-const ChevronRight = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
-  </svg>
-);
-
-const XIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
 
@@ -127,12 +108,11 @@ function summaryBadgeColor(score: number) {
 
 export default function MobilityScreen() {
   const [data, setData] = useState<MobilityState>(mobilitySeed);
-  const [activeChip, setActiveChip] = useState<string | null>(null);
-  const [elbeAnswer, setElbeAnswer] = useState<string>("");
 
   const freshness = freshnessLabel(data.freshness);
   const meanings = mobilityMeaning(data.overallScore, data.recommendation);
   const badge = summaryBadgeColor(data.overallScore);
+  const showInsights = data.freshness.state === "live";
 
   // Hydrate all metrics from live transit API
   useEffect(() => {
@@ -260,16 +240,6 @@ export default function MobilityScreen() {
     tryLiveData();
   }, []);
 
-  function handleChip(prompt: string) {
-    if (activeChip === prompt) {
-      setActiveChip(null);
-      setElbeAnswer("");
-      return;
-    }
-    setActiveChip(prompt);
-    setElbeAnswer(askElbeAnswer(prompt, data));
-  }
-
   const tc = transitColors(data.transitFlow.label);
   const dc = disruptionColors(data.disruptionLevel.label);
   const cc = comfortColors(data.movingComfort.label);
@@ -390,10 +360,10 @@ export default function MobilityScreen() {
         </div>
       </div>
 
-      {/* ── Bottom 3-column grid: What this means / Ask Magdeburg / Local notes ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {showInsights && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-        {/* ── 6. What this means today ─────────────────────────────── */}
+          {/* ── 6. What this means today ─────────────────────────────── */}
         <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col gap-3">
           <div className="flex items-center gap-2 pb-2 border-b border-zinc-100">
             <span className="w-6 h-6 rounded-md bg-zinc-100 flex items-center justify-center text-zinc-500">
@@ -411,44 +381,6 @@ export default function MobilityScreen() {
               </li>
             ))}
           </ul>
-        </div>
-
-        {/* ── 7. Ask Magdeburg strip ───────────────────────────────── */}
-        <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col gap-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-100">
-            <span className="w-6 h-6 rounded-md bg-zinc-100 flex items-center justify-center text-zinc-500">
-              <ChatIcon className="w-3.5 h-3.5" />
-            </span>
-            <h3 className="text-[13px] font-black text-[#0a2540]">Ask Magdeburg</h3>
-          </div>
-          <p className="text-[11px] text-zinc-400 font-semibold">
-            Your city assistant — ask a quick question.
-          </p>
-          <div className="flex flex-col gap-2">
-            {data.prompts.map((prompt) => (
-              <button
-                key={prompt}
-                onClick={() => handleChip(prompt)}
-                className={`text-left text-[11px] font-semibold px-3 py-2 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
-                  activeChip === prompt
-                    ? "bg-[#0c6b5b] text-white border-[#0c6b5b]"
-                    : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100 hover:border-zinc-300"
-                }`}
-              >
-                <span>{prompt}</span>
-                {activeChip === prompt ? (
-                  <XIcon className="w-3 h-3 flex-shrink-0" />
-                ) : (
-                  <ChevronRight className="w-3 h-3 flex-shrink-0 text-zinc-400" />
-                )}
-              </button>
-            ))}
-          </div>
-          {activeChip && elbeAnswer && (
-            <div className="mt-1 bg-[#eefcf7] border border-emerald-200 rounded-xl p-3.5 text-[11px] text-[#0a4d40] font-semibold leading-relaxed animate-fadeIn">
-              {elbeAnswer}
-            </div>
-          )}
         </div>
 
         {/* ── 8. Local notes card ──────────────────────────────────── */}
@@ -472,7 +404,7 @@ export default function MobilityScreen() {
           </div>
         </div>
 
-      </div>
+      </div>)}
 
       {/* ── 9. Footer Principles Strip ─────────────────────────────── */}
       <div className="border-t border-zinc-100 pt-5 grid grid-cols-2 sm:grid-cols-4 gap-4">

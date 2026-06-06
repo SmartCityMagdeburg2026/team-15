@@ -7,7 +7,6 @@ import { environmentSeed } from "./seed";
 import {
   freshnessLabel,
   environmentMeaning,
-  askElbeAnswer,
   airScore,
   comfortScore,
   greenScore,
@@ -65,12 +64,6 @@ const InfoIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   </svg>
 );
 
-const ChatIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 0 1-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-  </svg>
-);
-
 const NoteIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2" />
@@ -80,18 +73,6 @@ const NoteIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 const CheckIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-  </svg>
-);
-
-const ChevronRight = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
-  </svg>
-);
-
-const XIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
 
@@ -126,10 +107,9 @@ function summaryBadgeColor(score: number) {
 
 export default function EnvironmentScreen() {
   const [data, setData] = useState<EnvironmentState>(environmentSeed);
-  const [activeChip, setActiveChip] = useState<string | null>(null);
-  const [elbeAnswer, setElbeAnswer] = useState<string>("");
 
   const freshness = freshnessLabel(data.freshness);
+  const showInsights = data.freshness.state === "live";
   const meanings = environmentMeaning(data.overallScore, data.recommendation);
   const badge = summaryBadgeColor(data.overallScore);
 
@@ -141,7 +121,6 @@ export default function EnvironmentScreen() {
       let newAirDisplay = environmentSeed.airQuality.displayValue;
       let newAirHelper = environmentSeed.airQuality.helper;
       let newComfortLabel: EnvironmentState["urbanComfort"]["label"] = environmentSeed.urbanComfort.label;
-      let newComfortScore = environmentSeed.urbanComfort.score;
       let newComfortDisplay = environmentSeed.urbanComfort.displayValue;
       let newComfortHelper = environmentSeed.urbanComfort.helper;
       let newGreenLabel: EnvironmentState["greenAccess"]["label"] = environmentSeed.greenAccess.label;
@@ -203,7 +182,6 @@ export default function EnvironmentScreen() {
               newComfortDisplay = wind > 45 ? "Windy & exposed" : "Heat building";
               newComfortHelper  = "Heat or exposure may make outdoor conditions less comfortable today.";
             }
-            newComfortScore = comfortScore(newComfortLabel);
             gotLive = true;
           }
         }
@@ -309,16 +287,6 @@ export default function EnvironmentScreen() {
 
     tryLiveData();
   }, [data.greenAccess.label]);
-
-  function handleChip(prompt: string) {
-    if (activeChip === prompt) {
-      setActiveChip(null);
-      setElbeAnswer("");
-      return;
-    }
-    setActiveChip(prompt);
-    setElbeAnswer(askElbeAnswer(prompt, data));
-  }
 
   const ac = airColors(data.airQuality.label);
   const cc = comfortColors(data.urbanComfort.label);
@@ -445,86 +413,49 @@ export default function EnvironmentScreen() {
         </div>
       </div>
 
-      {/* ── Bottom 3-column grid ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      {showInsights && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-        {/* ── 6. What this means today ─────────────────────────────────── */}
-        <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col gap-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-100">
-            <span className="w-6 h-6 rounded-md bg-zinc-100 flex items-center justify-center text-zinc-500">
-              <InfoIcon className="w-3.5 h-3.5" />
-            </span>
-            <h3 className="text-[13px] font-black text-[#0a2540]">What this means today</h3>
-          </div>
-          <ul className="space-y-2.5">
-            {meanings.map((line, i) => (
-              <li key={i} className="flex gap-2.5 items-start">
-                <span className="flex-shrink-0 mt-0.5 w-4 h-4 rounded-full bg-[#16a34a] flex items-center justify-center">
-                  <CheckIcon className="w-2.5 h-2.5 text-white" />
-                </span>
-                <span className="text-xs text-zinc-600 font-semibold leading-snug">{line}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* ── 7. Ask Elbe strip ────────────────────────────────────────── */}
-        <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col gap-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-100">
-            <span className="w-6 h-6 rounded-md bg-[#eefcf7] flex items-center justify-center">
-              <ChatIcon className="w-3.5 h-3.5 text-[#16a34a]" />
-            </span>
-            <h3 className="text-[13px] font-black text-[#0a2540]">Ask Elbe</h3>
-          </div>
-          <p className="text-[11px] text-zinc-400 font-semibold">
-            Your environment assistant — tap to find out more.
-          </p>
-          <div className="flex flex-col gap-2">
-            {data.prompts.map((prompt) => (
-              <button
-                key={prompt}
-                onClick={() => handleChip(prompt)}
-                className={`text-left text-[11px] font-semibold px-3 py-2 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer ${
-                  activeChip === prompt
-                    ? "bg-[#16a34a] text-white border-[#16a34a]"
-                    : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-green-50/60 hover:border-green-200"
-                }`}
-              >
-                <span>{prompt}</span>
-                {activeChip === prompt ? (
-                  <XIcon className="w-3 h-3 flex-shrink-0" />
-                ) : (
-                  <ChevronRight className="w-3 h-3 flex-shrink-0 text-zinc-400" />
-                )}
-              </button>
-            ))}
-          </div>
-          {activeChip && elbeAnswer && (
-            <div className="mt-1 bg-[#eefcf7] border border-emerald-200 rounded-xl p-3.5 text-[11px] text-[#0a4d40] font-semibold leading-relaxed animate-fadeIn">
-              {elbeAnswer}
+          {/* ── 6. What this means today ─────────────────────────────────── */}
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col gap-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-zinc-100">
+              <span className="w-6 h-6 rounded-md bg-zinc-100 flex items-center justify-center text-zinc-500">
+                <InfoIcon className="w-3.5 h-3.5" />
+              </span>
+              <h3 className="text-[13px] font-black text-[#0a2540]">What this means today</h3>
             </div>
-          )}
-        </div>
-
-        {/* ── 8. Local notes card ──────────────────────────────────────── */}
-        <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col gap-3">
-          <div className="flex items-center gap-2 pb-2 border-b border-zinc-100">
-            <span className="w-6 h-6 rounded-md bg-zinc-100 flex items-center justify-center text-zinc-500">
-              <NoteIcon className="w-3.5 h-3.5" />
-            </span>
-            <h3 className="text-[13px] font-black text-[#0a2540]">Local notes</h3>
+            <ul className="space-y-2.5">
+              {meanings.map((line, i) => (
+                <li key={i} className="flex gap-2.5 items-start">
+                  <span className="flex-shrink-0 mt-0.5 w-4 h-4 rounded-full bg-[#16a34a] flex items-center justify-center">
+                    <CheckIcon className="w-2.5 h-2.5 text-white" />
+                  </span>
+                  <span className="text-xs text-zinc-600 font-semibold leading-snug">{line}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="divide-y divide-zinc-100">
-            {data.notes.map((note, i) => (
-              <div key={i} className="py-3 first:pt-0 last:pb-0 flex gap-3 items-start">
-                <span className={`flex-shrink-0 mt-1 w-2 h-2 rounded-full ${i === 0 ? "bg-[#16a34a]" : i === 1 ? "bg-amber-400" : "bg-[#0c6b5b]"}`} />
-                <p className="text-[11px] text-zinc-600 font-semibold leading-snug">{note}</p>
-              </div>
-            ))}
-          </div>
-        </div>
 
-      </div>
+          {/* ── 8. Local notes card ──────────────────────────────────────── */}
+          <div className="bg-white border border-zinc-200/80 rounded-2xl p-5 shadow-xs flex flex-col gap-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-zinc-100">
+              <span className="w-6 h-6 rounded-md bg-zinc-100 flex items-center justify-center text-zinc-500">
+                <NoteIcon className="w-3.5 h-3.5" />
+              </span>
+              <h3 className="text-[13px] font-black text-[#0a2540]">Local notes</h3>
+            </div>
+            <div className="divide-y divide-zinc-100">
+              {data.notes.map((note, i) => (
+                <div key={i} className="py-3 first:pt-0 last:pb-0 flex gap-3 items-start">
+                  <span className={`flex-shrink-0 mt-1 w-2 h-2 rounded-full ${i === 0 ? "bg-[#16a34a]" : i === 1 ? "bg-amber-400" : "bg-[#0c6b5b]"}`} />
+                  <p className="text-[11px] text-zinc-600 font-semibold leading-snug">{note}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      )}
 
       {/* ── 9. Footer Principles Strip ───────────────────────────────────── */}
       <div className="border-t border-zinc-100 pt-5 grid grid-cols-2 sm:grid-cols-4 gap-4">
