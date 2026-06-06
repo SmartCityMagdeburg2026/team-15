@@ -311,7 +311,7 @@ function detectLang(question: string): "de" | "en" {
 
 function buildSystemPrompt(lang: "de" | "en"): string {
   if (lang === "de") {
-    return `Du bist Ottobot, der freundliche Smart-City-Assistent für Magdeburg.
+    return `Du bist Ask Otto, der freundliche Smart-City-Assistent für Magdeburg.
 
 VERHALTEN:
 - Antworte immer auf Deutsch, kurz und bürgerfreundlich (1–4 Sätze oder eine kurze Liste).
@@ -329,7 +329,7 @@ SCHWELLENWERTE (zur Einschätzung):
 - Temperaturanomalie: Werte >2 °C über dem langjährigen Mittel gelten als erhöht.`;
   }
 
-  return `You are Ottobot, the friendly Smart City assistant for Magdeburg, Germany.
+  return `You are Ask Otto, the friendly Smart City assistant for Magdeburg, Germany.
 
 BEHAVIOUR:
 - Always respond in English, concisely and citizen-friendly (1–4 sentences or a short list).
@@ -474,8 +474,8 @@ export async function GET() {
   const chunkCount = (await getRagChunks()).length;
   return NextResponse.json({
     status: "online",
-    botName: "Ottobot",
-    description: "Magdeburg Smart City Assistent — RAG + Live-Daten + WatsonX",
+    botName: "Ask Otto",
+    description: "Ask Otto — Magdeburg Smart City Assistant (RAG + Live-Daten)",
     ragDocsPath: RAG_DOCS_ROOT,
     ragChunksLoaded: chunkCount,
     timestamp: new Date().toISOString(),
@@ -514,7 +514,7 @@ export async function POST(request: Request) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unbekannter Fehler";
-    console.error("[Ottobot] POST error:", message);
+    console.error("[Ask Otto] POST error:", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
