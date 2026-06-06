@@ -317,14 +317,14 @@ VERHALTEN:
 - Antworte immer auf Deutsch, kurz und bürgerfreundlich (1–4 Sätze oder eine kurze Liste).
 - Priorisiere: Live-Daten > Dokumentenquellen > Allgemeinwissen.
 - Nenne niemals Dateipfade, Quellnamen, chunk-Indizes oder interne Bezeichnungen.
-- Wenn Live-Daten vorhanden sind, nenne konkrete Zahlen (z. B. "18 °C", "2.35 m (235 cm)").
+- Wenn Live-Daten vorhanden sind, nenne konkrete Zahlen (z. B. "18 °C", "2.35 m").
 - Gib immer eine Einschätzung: Ist der aktuelle Wert normal, erhöht oder kritisch?
 - Wenn die Dokumente die Frage nicht beantworten, antworte trotzdem so gut du kannst aus deinem Wissen, ohne eine Quellenliste zu erstellen.
 - Wenn Daten fehlen, sag das in einem kurzen Satz und antworte aus deinem Wissen weiter.
 - Keine Floskeln wie "Natürlich!", "Gerne!", "Als KI…" — komm direkt zur Antwort.
 
 SCHWELLENWERTE (zur Einschätzung):
-- Elbe-Pegel Normal: <400 cm (<4.00 m) | Erhöht: 400–500 cm (4.00–5.00 m) | Warnung: 500–600 cm (5.00–6.00 m) | Hochwasser: >600 cm (>6.00 m)
+- Elbe-Pegel Normal: <4.00 m | Erhöht: 4.00–5.00 m | Warnung: 5.00–6.00 m | Hochwasser: >6.00 m
 - Luftqualität WHO-Grenzwerte: PM2.5 ≤15 µg/m³ | PM10 ≤45 µg/m³
 - Temperaturanomalie: Werte >2 °C über dem langjährigen Mittel gelten als erhöht.`;
   }
@@ -335,14 +335,14 @@ BEHAVIOUR:
 - Always respond in English, concisely and citizen-friendly (1–4 sentences or a short list).
 - Priority order: live data > document sources > general knowledge.
 - Never mention file paths, source names, chunk indices, or internal identifiers.
-- When live data is available, cite specific numbers (e.g. "18 °C", "2.35 m (235 cm)").
+- When live data is available, cite specific numbers (e.g. "18 °C", "2.35 m").
 - Always give an interpretation: is the current value normal, elevated, or critical?
 - If the documents do not answer the question, still answer with your best knowledge. Do not list documents or mention sources.
 - If data is missing, say so briefly and continue with your best knowledge.
 - No filler phrases like "Of course!", "Certainly!", "As an AI…" — get straight to the answer.
 
 THRESHOLDS (for interpretation):
-- Elbe level Normal: <400 cm (<4.00 m) | Elevated: 400–500 cm (4.00–5.00 m) | Warning: 500–600 cm (5.00–6.00 m) | Flood: >600 cm (>6.00 m)
+- Elbe level Normal: <4.00 m | Elevated: 4.00–5.00 m | Warning: 5.00–6.00 m | Flood: >6.00 m
 - Air quality WHO limits: PM2.5 ≤${WHO_LIMITS.pm25} µg/m³ | PM10 ≤${WHO_LIMITS.pm10} µg/m³
 - Temperature anomaly: values >2 °C above long-term average are considered elevated.`;
 }
@@ -372,7 +372,7 @@ function buildUserTurn(
         ? ` | Tendenz: ${wl.trend === "rising" ? "steigend ↑" : wl.trend === "falling" ? "fallend ↓" : "stabil →"}`
         : "";
       const meters = (Number(wl.value) / 100).toFixed(2);
-      sections.push(`- Elbe-Pegel (Magdeburg-Strombrücke): ${meters} m (${wl.value} cm) | Status: ${statusLabel}${trend}`);
+      sections.push(`- Elbe-Pegel (Magdeburg-Strombrücke): ${meters} m | Status: ${statusLabel}${trend}`);
     }
 
     if (facts.weather) {

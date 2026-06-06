@@ -124,10 +124,13 @@ export default function MapPageClient() {
 
   return (
     <main className="w-full max-w-[1450px] mx-auto p-6 lg:p-10">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-black text-[#0a2540]">Interactive Sensors Map</h1>
-          <p className="text-sm text-zinc-500 mt-2">Toggle filter layers and click any active pin to inspect live telemetry.</p>
+      <div className="space-y-6 animate-fadeIn text-left">
+        <div className="pb-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-[#16a34a] mb-1">City pulse</p>
+          <h1 className="text-[28px] sm:text-[34px] font-black tracking-tight text-[#0a2540] leading-none">
+            Interactive Sensors Map
+          </h1>
+          <p className="text-sm text-zinc-500 font-semibold mt-2">Toggle filter layers and click any active pin to inspect live telemetry.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">

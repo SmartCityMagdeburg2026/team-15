@@ -1,7 +1,7 @@
 import RentByDistrict from "@/features/housing/affordability/RentByDistrict";
 
 export const metadata = {
-  title: "Housing — Magdeburg Pulse",
+  title: "Housing & Affordability — Magdeburg Pulse",
 };
 
 export default function HousingPage() {

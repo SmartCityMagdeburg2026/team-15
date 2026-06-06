@@ -88,7 +88,7 @@ const BusIcon = () => (
 );
 
 const WarningIcon = () => (
-  <div className="w-10 h-10 flex items-center justify-center text-orange-500">
+  <div className="w-10 h-10 flex items-center justify-center text-orange-400">
     <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2V8h2v4z" />
     </svg>
@@ -719,10 +719,10 @@ out center;`;
       metricLabel: "Avg Speed",
       metricValue: "42 km/h",
       status: "Minor Delay",
-      statusColor: "text-amber-500",
+      statusColor: "text-amber-400",
       top: "52%",
       right: "26%",
-      color: "bg-orange-500",
+      color: "bg-orange-400",
       metrics: [
         { label: "Speed Limit", value: "50 km/h" },
         { label: "Avg Speed", value: "42 km/h" },
@@ -741,7 +741,7 @@ out center;`;
       statusColor: "text-emerald-500",
       top: "70%",
       left: "25%",
-      color: "bg-orange-500",
+      color: "bg-orange-400",
       metrics: [
         { label: "Flow Rate", value: "1,240 veh/h" },
         { label: "Avg Speed", value: "68 km/h" },
@@ -1087,22 +1087,22 @@ out center;`;
               </div>
 
               {/* CARD 4: Traffic Disruptions */}
-              <div className="bg-gradient-to-br from-white via-white to-rose-50/15 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-orange-500/20 transition-all duration-300 min-h-[220px] text-center items-center">
+              <div className="bg-gradient-to-br from-white via-white to-amber-50/12 border border-zinc-200/80 rounded-2xl p-5 flex flex-col justify-between hover:shadow-md hover:-translate-y-1 hover:border-orange-300/20 transition-all duration-300 min-h-[220px] text-center items-center">
                 <div className="flex justify-between items-center text-[10px] font-black text-zinc-400 uppercase tracking-wider w-full text-left">
                   <span>Traffic alerts</span>
-                  <span className="text-orange-500 text-[11px]">⚠</span>
+                  <span className="text-orange-400 text-[11px]">⚠</span>
                 </div>
                 
-                <div className="my-1.5 flex flex-col items-center gap-0.5">
+                  <div className="my-1.5 flex flex-col items-center gap-0.5">
                   <WarningIcon />
-                  <div className="text-2xl font-black text-orange-500 leading-none mt-0.5">{traffic.activeCount}</div>
-                  <div className="text-[9px] font-black text-[#c2410c] uppercase tracking-wider bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-md mt-1">Delays Active</div>
+                  <div className="text-2xl font-black text-orange-400 leading-none mt-0.5">{traffic.activeCount}</div>
+                  <div className="text-[9px] font-black text-orange-500 uppercase tracking-wider bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-md mt-1">Delays Active</div>
                 </div>
                 
                 <div className="w-full text-left">
                   <div className="text-[11px] text-zinc-500 font-semibold leading-tight line-clamp-2">{traffic.desc}</div>
-                  <div className="mt-3 border-t border-zinc-100 pt-3 flex items-center justify-center gap-1.5 text-[11px] font-extrabold text-orange-500 w-full">
-                    <ArrowUpRight className="text-orange-500 w-3.5 h-3.5" />
+                  <div className="mt-3 border-t border-zinc-100 pt-3 flex items-center justify-center gap-1.5 text-[11px] font-extrabold text-orange-400 w-full">
+                    <ArrowUpRight className="text-orange-400 w-3.5 h-3.5" />
                     <span>{traffic.comparison}</span>
                   </div>
                 </div>
@@ -1165,15 +1165,15 @@ out center;`;
 
                     {/* Log 2: Traffic */}
                     <div className="flex gap-4 items-start bg-zinc-50/50 hover:bg-zinc-50 border border-zinc-100 rounded-xl p-3.5 transition-colors">
-                      <div className="w-8 h-8 rounded-full bg-orange-50/80 flex-shrink-0 flex items-center justify-center text-orange-600 border border-orange-100">
-                        <svg className="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
+                      <div className="w-8 h-8 rounded-full bg-orange-50/80 flex-shrink-0 flex items-center justify-center text-orange-400 border border-orange-100">
+                        <svg className="w-4 h-4 text-orange-400" fill="currentColor" viewBox="0 0 24 24">
                           <path d="M12 2L1 21h22L12 2zm1 14h-2v-2h2v2zm0-4h-2V8h2v4z" />
                         </svg>
                       </div>
                       <div className="text-[13px] leading-snug">
                         <div className="flex items-center gap-2">
                           <span className="font-black text-zinc-800">Delays on B1 Route</span>
-                          <span className="text-[9px] font-bold text-orange-700 bg-orange-150/50 px-1.5 py-0.5 rounded uppercase">MOBILITY</span>
+                          <span className="text-[9px] font-bold text-orange-500 bg-orange-100/40 px-1.5 py-0.5 rounded uppercase">MOBILITY</span>
                         </div>
                         <p className="text-zinc-500 mt-1 font-semibold text-xs leading-normal">Collision near Olvenstedter Straße has been cleared; expect minor residual delays.</p>
                       </div>

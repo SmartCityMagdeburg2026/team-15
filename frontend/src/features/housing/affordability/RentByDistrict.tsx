@@ -142,7 +142,17 @@ export default function RentByDistrict() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fadeIn text-left">
+      {/* Page heading — keep style consistent with Environment screen */}
+      <div className="pb-1">
+        <p className="text-[10px] font-black uppercase tracking-widest text-[#16a34a] mb-1">City pulse</p>
+        <h1 className="text-[28px] sm:text-[34px] font-black tracking-tight text-[#0a2540] leading-none">
+          Housing & Affordability
+        </h1>
+        <p className="text-sm text-zinc-500 font-semibold mt-2">
+          How affordable is living in Magdeburg?
+        </p>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
         {cards.map((card) => (
           <div key={card.title}   className={`${card.bg} border border-zinc-200/80 rounded-2xl p-2 shadow-xs h-16 sm:h-20 flex flex-col justify-center`}>

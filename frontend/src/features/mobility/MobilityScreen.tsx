@@ -73,20 +73,20 @@ const CheckIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 
 function transitColors(label: string) {
   if (label === "Good") return { text: "text-[#0c6b5b]", bg: "bg-emerald-50", border: "border-emerald-200", icon: "text-emerald-600 bg-emerald-100" };
-  if (label === "Moderate") return { text: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200", icon: "text-amber-600 bg-amber-100" };
-  return { text: "text-rose-600", bg: "bg-rose-50", border: "border-rose-200", icon: "text-rose-600 bg-rose-100" };
+  if (label === "Moderate") return { text: "text-amber-400", bg: "bg-amber-50", border: "border-amber-200", icon: "text-amber-400 bg-amber-100" };
+  return { text: "text-rose-400", bg: "bg-rose-50", border: "border-rose-200", icon: "text-rose-400 bg-rose-100" };
 }
 
 function disruptionColors(label: string) {
-  if (label === "Low") return { text: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200", icon: "text-amber-600 bg-amber-100" };
-  if (label === "Moderate") return { text: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200", icon: "text-orange-600 bg-orange-100" };
-  return { text: "text-rose-600", bg: "bg-rose-50", border: "border-rose-200", icon: "text-rose-600 bg-rose-100" };
+  if (label === "Low") return { text: "text-amber-400", bg: "bg-amber-50", border: "border-amber-200", icon: "text-amber-400 bg-amber-100" };
+  if (label === "Moderate") return { text: "text-orange-400", bg: "bg-orange-50", border: "border-orange-200", icon: "text-orange-400 bg-orange-100" };
+  return { text: "text-rose-400", bg: "bg-rose-50", border: "border-rose-200", icon: "text-rose-400 bg-rose-100" };
 }
 
 function comfortColors(label: string) {
   if (label === "Good") return { text: "text-[#0c6b5b]", bg: "bg-teal-50", border: "border-teal-200", icon: "text-teal-600 bg-teal-100" };
-  if (label === "Fair") return { text: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200", icon: "text-amber-600 bg-amber-100" };
-  return { text: "text-rose-600", bg: "bg-rose-50", border: "border-rose-200", icon: "text-rose-600 bg-rose-100" };
+  if (label === "Fair") return { text: "text-amber-400", bg: "bg-amber-50", border: "border-amber-200", icon: "text-amber-400 bg-amber-100" };
+  return { text: "text-rose-400", bg: "bg-rose-50", border: "border-rose-200", icon: "text-rose-400 bg-rose-100" };
 }
 
 function noteDot(color: string) {
@@ -99,9 +99,9 @@ function noteDot(color: string) {
 
 function summaryBadgeColor(score: number) {
   if (score >= 80) return { ring: "bg-[#0c6b5b]", text: "text-[#0c6b5b]", bg: "bg-emerald-50 border-emerald-200" };
-  if (score >= 65) return { ring: "bg-amber-500", text: "text-amber-700", bg: "bg-amber-50 border-amber-200" };
-  if (score >= 50) return { ring: "bg-orange-500", text: "text-orange-700", bg: "bg-orange-50 border-orange-200" };
-  return { ring: "bg-rose-500", text: "text-rose-700", bg: "bg-rose-50 border-rose-200" };
+  if (score >= 65) return { ring: "bg-amber-400", text: "text-amber-700", bg: "bg-amber-50 border-amber-200" };
+  if (score >= 50) return { ring: "bg-orange-400", text: "text-orange-700", bg: "bg-orange-50 border-orange-200" };
+  return { ring: "bg-rose-400", text: "text-rose-700", bg: "bg-rose-50 border-rose-200" };
 }
 
 // ── Main Component ────────────────────────────────────────────────────────

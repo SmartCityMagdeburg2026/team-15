@@ -80,27 +80,27 @@ const CheckIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 
 function airColors(label: string) {
   if (label === "Good")  return { text: "text-[#16a34a]", bg: "bg-emerald-50", border: "border-emerald-200", icon: "text-emerald-600 bg-emerald-100" };
-  if (label === "Fair")  return { text: "text-amber-600",  bg: "bg-amber-50",   border: "border-amber-200",   icon: "text-amber-600 bg-amber-100" };
-  return                        { text: "text-rose-600",   bg: "bg-rose-50",    border: "border-rose-200",    icon: "text-rose-600 bg-rose-100" };
+  if (label === "Fair")  return { text: "text-amber-400",  bg: "bg-amber-50",   border: "border-amber-200",   icon: "text-amber-400 bg-amber-100" };
+  return                        { text: "text-rose-400",   bg: "bg-rose-50",    border: "border-rose-200",    icon: "text-rose-400 bg-rose-100" };
 }
 
 function comfortColors(label: string) {
   if (label === "Comfortable") return { text: "text-[#0c6b5b]", bg: "bg-teal-50",   border: "border-teal-200",   icon: "text-teal-600 bg-teal-100" };
-  if (label === "Mixed")       return { text: "text-amber-600",  bg: "bg-amber-50",  border: "border-amber-200",  icon: "text-amber-600 bg-amber-100" };
-  return                              { text: "text-rose-600",   bg: "bg-rose-50",   border: "border-rose-200",   icon: "text-rose-600 bg-rose-100" };
+  if (label === "Mixed")       return { text: "text-amber-400",  bg: "bg-amber-50",  border: "border-amber-200",  icon: "text-amber-400 bg-amber-100" };
+  return                              { text: "text-rose-400",   bg: "bg-rose-50",   border: "border-rose-200",   icon: "text-rose-400 bg-rose-100" };
 }
 
 function greenColors(label: string) {
   if (label === "Strong")   return { text: "text-[#15803d]", bg: "bg-green-50",  border: "border-green-200",  icon: "text-green-600 bg-green-100" };
   if (label === "Moderate") return { text: "text-[#0c6b5b]", bg: "bg-teal-50",   border: "border-teal-200",   icon: "text-teal-600 bg-teal-100" };
-  return                           { text: "text-amber-600",  bg: "bg-amber-50",  border: "border-amber-200",  icon: "text-amber-600 bg-amber-100" };
+  return                           { text: "text-amber-400",  bg: "bg-amber-50",  border: "border-amber-200",  icon: "text-amber-400 bg-amber-100" };
 }
 
 function summaryBadgeColor(score: number) {
   if (score >= 80) return { ring: "bg-[#16a34a]", text: "text-[#16a34a]", bg: "bg-emerald-50 border-emerald-200" };
-  if (score >= 65) return { ring: "bg-amber-500",  text: "text-amber-700",  bg: "bg-amber-50 border-amber-200" };
-  if (score >= 50) return { ring: "bg-orange-500", text: "text-orange-700", bg: "bg-orange-50 border-orange-200" };
-  return                  { ring: "bg-rose-500",   text: "text-rose-700",   bg: "bg-rose-50 border-rose-200" };
+  if (score >= 65) return { ring: "bg-amber-400",  text: "text-amber-700",  bg: "bg-amber-50 border-amber-200" };
+  if (score >= 50) return { ring: "bg-orange-400", text: "text-orange-700", bg: "bg-orange-50 border-orange-200" };
+  return                  { ring: "bg-rose-400",   text: "text-rose-700",   bg: "bg-rose-50 border-rose-200" };
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────

@@ -909,7 +909,7 @@ export default function Home() {
                   <WaveIcon />
                   <div className="text-center">
                     <div className="text-2xl font-black text-zinc-955 tracking-tighter leading-none mt-1">
-                      {elbe.level.toFixed(2)} m {elbe.level_cm ? `(${elbe.level_cm} cm)` : ""}
+                      {elbe.level.toFixed(2)} m
                     </div>
                     <div className="text-[9.5px] font-black text-[#2563eb] mt-0.5 uppercase tracking-wider bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-md inline-block">{elbe.status}</div>
                   </div>

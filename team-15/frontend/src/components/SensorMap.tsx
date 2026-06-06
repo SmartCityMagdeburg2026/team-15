@@ -74,11 +74,12 @@ const getMarkerIcon = (color: string, type: string) => {
   if (color.includes("bg-sky-500")) hexColor = "#0ea5e9";
   else if (color.includes("bg-blue-600")) hexColor = "#2563eb";
   else if (color.includes("bg-orange-500")) hexColor = "#f97316";
-  else if (color.includes("bg-emerald-500") || color.includes("bg-green-600")) hexColor = "#10b981";
+   else if (color.includes("bg-orange-500") || color.includes("bg-orange-400")) hexColor = "#fb923c";
+   else if (color.includes("bg-emerald-500") || color.includes("bg-green-600")) hexColor = "#10b981";
   else if (color.includes("bg-indigo-500")) hexColor = "#6366f1";
   else if (color.includes("bg-red-500")) hexColor = "#ef4444";
   else if (color.includes("bg-rose-500")) hexColor = "#f43f5e";
-
+   else if (color.includes("bg-rose-500") || color.includes("bg-rose-400")) hexColor = "#fb7185";
   const emoji = emojiMap[type] || "📍";
 
   return L.divIcon({
